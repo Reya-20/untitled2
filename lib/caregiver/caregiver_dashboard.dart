@@ -49,7 +49,7 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
 
   Future<void> _fetchPatientNames() async {
     try {
-      final response = await http.get(Uri.parse('http://192.168.1.5/alarm/navbar_api/patient_list.php'));
+      final response = await http.get(Uri.parse('http://192.168.1.9/alarm/navbar_api/patient_list.php'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         setState(() {
@@ -70,10 +70,10 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
     String url;
     if (patientId == null) {
       // Fetch all alarms if patientId is null
-      url = 'http://192.168.1.5/alarm/alarm_api/get_alarm.php?role=$userRole';
+      url = 'http://192.168.1.9/alarm/alarm_api/get_alarm.php?role=$userRole';
     } else {
       // Fetch alarms for the specific patient
-      url = 'http://192.168.1.5/alarm/alarm_api/get_alarm.php?patient_id=$patientId&role=$userRole';
+      url = 'http://192.168.1.9/alarm/alarm_api/get_alarm.php?patient_id=$patientId&role=$userRole';
     }
 
     try {

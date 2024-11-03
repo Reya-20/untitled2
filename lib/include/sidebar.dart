@@ -22,7 +22,7 @@ class CustomDrawer extends StatelessWidget {
   });
 
   Future<void> _logout(BuildContext context) async {
-    final url = Uri.parse('http://192.168.0.21/alarm/account_api/logout.php'); // Your logout API endpoint
+    final url = Uri.parse('http://192.168.0.9/alarm/account_api/logout.php'); // Your logout API endpoint
 
     try {
       final response = await http.get(url);

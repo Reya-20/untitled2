@@ -80,7 +80,7 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _uploadPatient(String name, String username, String password) async {
-    final url = Uri.parse('http://192.168.1.5/alarm/patient_api/post_patient.php');
+    final url = Uri.parse('http://http://192.168.1.9/alarm/patient_api/post_patient.php');
 
     try {
       final response = await http.post(

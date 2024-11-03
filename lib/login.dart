@@ -32,11 +32,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Prepare the API request
     try {
+      print('Attempting to log in with username: $username and password: $password');
       final response = await http.post(
-        Uri.parse('http://192.168.1.5/alarm/account_api/login.php'), // Your API URL
+        Uri.parse('http://192.168.1.9/alarm/account_api/login.php'), // Your API URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username, 'password': password}),
       );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
@@ -72,6 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
+      print('Error during login: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Failed to connect to the server'),

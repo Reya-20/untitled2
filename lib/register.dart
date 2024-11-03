@@ -28,53 +28,63 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
 
-  Future<void> _createAccount() async {
-    final String firstName = firstNameController.text;
-    final String lastName = lastNameController.text;
-    final String username = usernameController.text;
-    final String password = passwordController.text;
-    final String confirmPassword = confirmPasswordController.text;
+  String? errorMessage; // State variable for error message
 
-    if (password != confirmPassword) {
-      // Show an error message if passwords don't match
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Passwords do not match")),
-      );
+  Future<void> _createAccount() async {
+    final String firstName = firstNameController.text.trim();
+    final String lastName = lastNameController.text.trim();
+    final String username = usernameController.text.trim();
+    final String password = passwordController.text.trim();
+    final String confirmPassword = confirmPasswordController.text.trim();
+
+    // Validate input fields
+    if (firstName.isEmpty || lastName.isEmpty || username.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      setState(() {
+        errorMessage = "All fields must be filled out.";
+      });
       return;
     }
 
-    // Prepare data for the request
+    if (password != confirmPassword) {
+      setState(() {
+        errorMessage = "Passwords do not match.";
+      });
+      return;
+    }
+
+    // Clear the error message if validation passes
+    setState(() {
+      errorMessage = null;
+    });
+
     final Map<String, String> data = {
       'first_name': firstName,
       'last_name': lastName,
       'username': username,
       'password': password,
-      'confirm_password': confirmPassword, // Added confirm_password
+      'confirm_password': confirmPassword,
     };
 
-    // Send the POST request
     final response = await http.post(
-      Uri.parse('http://192.168.1.5/alarm/account_api/register.php'),
+      Uri.parse('http://192.168.1.9/alarm/account_api/register.php'),
       body: data,
     );
 
     if (response.statusCode == 200) {
       final result = jsonDecode(response.body);
-      // Handle success or failure response here
-      if (result['success']) { // Check for 'success' key
+      if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Account created successfully")),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to create account: ${result['message']}")),
-        );
+        setState(() {
+          errorMessage = "Failed to create account: ${result['message']}";
+        });
       }
     } else {
-      // Handle server error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: ${response.statusCode}")),
-      );
+      setState(() {
+        errorMessage = "Error: ${response.statusCode}";
+      });
     }
   }
 
@@ -82,18 +92,24 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF0E4C92),
+        backgroundColor: Color(0xFF26394A),
         elevation: 0.0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            Navigator.pop(context); // Go back to the previous screen
+            Navigator.pop(context);
           },
         ),
       ),
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView( // Add SingleChildScrollView here
-        child: Padding(
+      body: SingleChildScrollView(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF39cdaf), Color(0xFF26394A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -104,7 +120,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 style: TextStyle(
                   fontSize: 28.0,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0E4C92),
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 10.0),
@@ -112,13 +128,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 'Let\'s create your account',
                 style: TextStyle(
                   fontSize: 16.0,
-                  color: Colors.grey[700],
+                  color: Colors.white70,
                 ),
               ),
               const SizedBox(height: 30.0),
               CircleAvatar(
                 radius: 50.0,
-                backgroundImage: AssetImage('asset/image/logo.png'),
+                backgroundImage: AssetImage('asset/image/5-removebg-preview.png'),
               ),
               const SizedBox(height: 20.0),
               Text(
@@ -126,10 +142,24 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 style: TextStyle(
                   fontSize: 34.0,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0E4C92),
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 30.0),
+              const SizedBox(height: 10.0), // Space for the error message
+              if (errorMessage != null) // Display the error message if it's not null
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20.0),
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Text(
+                    errorMessage!,
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              const SizedBox(height: 10.0),
               _buildTextField('First Name', firstNameController),
               const SizedBox(height: 10.0),
               _buildTextField('Last Name', lastNameController),
@@ -144,7 +174,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 onPressed: _createAccount,
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 15.0, horizontal: 100.0),
-                  backgroundColor: Color(0xFF0E4C92),
+                  backgroundColor: Color(0xFF39cdaf),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
@@ -157,6 +187,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 40.0),
             ],
           ),
         ),
@@ -171,13 +202,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          color: Colors.grey[600],
+          color: Colors.white,
         ),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.2),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.0),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF0E4C92)),
+          borderSide: BorderSide(color: Color(0xFF39cdaf)),
           borderRadius: BorderRadius.circular(10.0),
         ),
       ),

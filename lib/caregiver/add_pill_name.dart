@@ -39,7 +39,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
 
   // Function to fetch medicines from the server
   Future<void> _fetchMedicines() async {
-    final url = Uri.parse('http://192.168.1.5/alarm/pill_api/get_pill.php'); // Replace with your actual URL
+    final url = Uri.parse('http://192.168.1.9/alarm/pill_api/get_pill.php'); // Replace with your actual URL
 
     try {
       final response = await http.get(url);
@@ -81,7 +81,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
 
   // Function to upload medicine names to the server
   Future<void> uploadMedicines(List<String> medicineNames) async {
-    final url = Uri.parse('http://192.168.1.5/alarm/pill_api/post_pill.php'); // Replace with your actual URL
+    final url = Uri.parse('http://192.168.1.9/alarm/pill_api/post_pill.php'); // Replace with your actual URL
 
     try {
       final response = await http.post(
