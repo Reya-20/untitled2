@@ -20,6 +20,7 @@ class _PatientScreenState extends State<PatientScreen> {
   FlutterLocalNotificationsPlugin();
   List<Map<String, dynamic>> _patientList = [];
   int userRole = 1; // Set user role (0 or 1) based on your logic
+
   @override
   void initState() {
     super.initState();
@@ -27,7 +28,7 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _fetchPatients() async {
-    final url = Uri.parse('http://192.168.1.5/alarm/patient_api/get_patient.php');
+    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/patient_api/get_patient.php');
 
     try {
       final response = await http.get(url);
@@ -80,7 +81,7 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _uploadPatient(String name, String username, String password) async {
-    final url = Uri.parse('http://http://192.168.1.9/alarm/patient_api/post_patient.php');
+    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/patient_api/post_patient.php');
 
     try {
       final response = await http.post(
@@ -128,6 +129,52 @@ class _PatientScreenState extends State<PatientScreen> {
     });
   }
 
+  void _showAddPatientDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Add New Patient'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(hintText: 'Patient Name'),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: _usernameController,
+                decoration: InputDecoration(hintText: 'Username'),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(hintText: 'Password'),
+                obscureText: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _addPatient();
+                Navigator.of(context).pop();
+              },
+              child: Text('Add Patient'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,130 +186,89 @@ class _PatientScreenState extends State<PatientScreen> {
             _scaffoldKey.currentState!.openDrawer();
           },
         ),
-        title: Text('Add Patient'),
+        title: Text('Patient List'),
         backgroundColor: Color(0xFF0E4C92),
       ),
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
         userRole: userRole,
-      ), // Call the existing sidebar widget here
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                hintText: 'Patient Name',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            SizedBox(height: 10),
-            TextField(
-              controller: _usernameController,
-              decoration: InputDecoration(
-                hintText: 'Username',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            SizedBox(height: 10),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                hintText: 'Password',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              obscureText: true,
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _addPatient,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text('Add Patient'),
-            ),
-            SizedBox(height: 20),
-            Expanded(
-              child: Container(
-                padding: EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Patient List',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF39cdaf), Color(0xFF26394A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Expanded(
+                child: _patientList.isEmpty
+                    ? Center(
+                  child: Text(
+                    "No patients added yet.",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
                     ),
-                    Expanded(
-                      child: _patientList.isEmpty
-                          ? Center(
-                        child: Text(
-                          "No patients added yet.",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      )
-                          : ListView.builder(
-                        itemCount: _patientList.length,
-                        itemBuilder: (context, index) {
-                          final patient = _patientList[index];
-                          return Card(
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                  ),
+                )
+                    : ListView.builder(
+                  itemCount: _patientList.length,
+                  itemBuilder: (context, index) {
+                    final patient = _patientList[index];
+                    return Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Patient Name: ${patient['name']}',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
-                            margin: EdgeInsets.symmetric(vertical: 8),
-                            child: ListTile(
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              title: Text(
-                                patient['name'],
-                                style: TextStyle(fontSize: 16, color: Colors.black),
-                              ),
-                              subtitle: Text(
-                                'Username: ${patient['username']}\nPassword: ${patient['password']}',
-                                style: TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              trailing: IconButton(
+                            SizedBox(height: 8),
+                            Text(
+                              'Username: ${patient['username']}',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Password: ${patient['password']}',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
                                 icon: Icon(Icons.delete, color: Colors.red),
                                 onPressed: () => _deletePatient(index),
                               ),
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddPatientDialog,
+        child: Icon(Icons.add),
+        backgroundColor: Color(0xFF0E4C92),
       ),
     );
   }

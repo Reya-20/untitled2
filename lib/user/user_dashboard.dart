@@ -51,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchAlarmData() async {
-    String url = 'http://192.168.1.9/alarm/alarm_api/getalarm.php'; // Ensure the correct URL
+    String url = 'http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/getalarm.php'; // Ensure the correct URL
 
     try {
       print('Fetching alarm data...');
@@ -138,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _updateAlarmStatusToMissed(int alarmId) async {
     try {
       final response = await http.put(
-        Uri.parse('http://192.168.1.9/alarm/alarm_api/alarm_update_missed.php'), // Ensure this URL is correct
+        Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_update_missed.php'), // Ensure this URL is correct
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {'id': alarmId.toString(), 'status': '2'}, // Send as form data for missed
       );
@@ -252,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _updateAlarmStatus(int alarmId) async {
     try {
       final response = await http.put(
-        Uri.parse('http://192.168.1.9/alarm/alarm_api/alarm_update.php'), // Ensure this URL is correct
+        Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_update.php'), // Ensure this URL is correct
         headers: {'Content-Type': 'application/x-www-form-urlencoded'}, // Use correct content type
         body: {'id': alarmId.toString(), 'status': '1'}, // Send as form data
       );
@@ -268,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Start a timer to reset the status to 0 after 1 second
           Timer(Duration(seconds: 3), () async {
             final resetResponse = await http.put(
-              Uri.parse('http://192.168.1.9/alarm/alarm_api/alarm_update.php'), // Ensure this URL is correct
+              Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_update.php'), // Ensure this URL is correct
               headers: {'Content-Type': 'application/x-www-form-urlencoded'},
               body: {'id': alarmId.toString(), 'status': '0'}, // Reset to status 0
             );

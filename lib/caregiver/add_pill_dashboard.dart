@@ -54,7 +54,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
 
   Future<void> _fetchMedicineNames() async {
     try {
-      final response = await http.get(Uri.parse('http://192.168.1.9/alarm/pill_api/get_pill.php'));
+      final response = await http.get(Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/pill_api/get_pill.php'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         setState(() {
@@ -73,7 +73,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
 
   Future<void> _fetchPatientNames() async {
     try {
-      final response = await http.get(Uri.parse('http://192.168.1.9/alarm/patient_api/get_patient.php'));
+      final response = await http.get(Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/patient_api/get_patient.php'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         setState(() {
@@ -103,7 +103,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
       return;
     }
 
-    final uri = Uri.parse('http://192.168.1.9/alarm/alarm_api/alarm_api.php');
+    final uri = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_api.php');
     final response = await http.post(
       uri,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},

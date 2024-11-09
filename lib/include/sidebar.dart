@@ -22,7 +22,7 @@ class CustomDrawer extends StatelessWidget {
   });
 
   Future<void> _logout(BuildContext context) async {
-    final url = Uri.parse('http://192.168.0.9/alarm/account_api/logout.php'); // Your logout API endpoint
+    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/account_api/logout.php'); // Your logout API endpoint
 
     try {
       final response = await http.get(url);
@@ -72,7 +72,7 @@ class CustomDrawer extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundImage: const NetworkImage('https://via.placeholder.com/150'),
+                  backgroundImage: AssetImage('asset/image/5-removebg-preview.png'),
                 ),
                 const SizedBox(width: 15),
                 Column(
@@ -90,32 +90,14 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
           // Conditionally render drawer items based on userRole
-          if (userRole != 0) ...[
+
             _buildDrawerItem(context, Icons.home, 'Home', () {
-              Navigator.pop(context);
-            }),
-            _buildDrawerItem(context, Icons.medication, 'Add Medicine', () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) =>  MedicineScreen()),
-              );
-            }),
-            _buildDrawerItem(context, Icons.lock_clock, 'Make Alarm', () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>  AlarmScreen(),
-                ),
-              );
-            }),
-            _buildDrawerItem(context, Icons.group_add, 'Add Family Members', () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) =>  PatientScreen()),
+                MaterialPageRoute(builder: (context) =>  HomeCareScreen()),
               );
             }),
 
-          ],
           const Spacer(),
           // Always show the Logout option
           _buildDrawerItem(context, Icons.logout, 'Logout', () {

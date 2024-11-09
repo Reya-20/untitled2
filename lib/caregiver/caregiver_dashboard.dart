@@ -3,7 +3,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../include/sidebar.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // For storing user role
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart'; // Import Speed Dial package
+import 'add_patient_name.dart';
+import 'add_pill_name.dart';
+import 'add_pill_dashboard.dart';
 
 void main() {
   runApp(MyApp());
@@ -13,8 +17,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Set debug flag to false
+      debugShowCheckedModeBanner: false,
       home: HomeCareScreen(),
+      theme: ThemeData(
+        primaryColor: Color(0xFF0E4C92),
+        hintColor: Colors.white,
+        textTheme: TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+        ),
+        colorScheme: ColorScheme.fromSwatch().copyWith(background: Color(0xFF0E4C92)),
+      ),
     );
   }
 }
@@ -27,29 +40,29 @@ class HomeCareScreen extends StatefulWidget {
 class _HomeCareScreenState extends State<HomeCareScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  int userRole = 1; // Set user role (0 or 1) based on your logic
-  List<Map<String, dynamic>> patientData = []; // List to hold patient data
-  List<Map<String, dynamic>> alarmData = []; // List to hold alarm data
-  bool hasNoAlarms = false; // Flag to track whether there are no alarms
+  int userRole = 1;
+  List<Map<String, dynamic>> patientData = [];
+  List<Map<String, dynamic>> alarmData = [];
+  bool hasNoAlarms = false;
 
   @override
   void initState() {
     super.initState();
-    _getUserRole(); // Fetch user role from shared preferences or wherever it's stored
-    _fetchPatientNames(); // Fetch patient names
-    _fetchAlarmData(); // Fetch all alarms initially
+    _getUserRole();
+    _fetchPatientNames();
+    _fetchAlarmData();
   }
 
   Future<void> _getUserRole() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      userRole = prefs.getInt('userRole') ?? 1; // Default to 1 if not set
+      userRole = prefs.getInt('userRole') ?? 1;
     });
   }
 
   Future<void> _fetchPatientNames() async {
     try {
-      final response = await http.get(Uri.parse('http://192.168.1.9/alarm/navbar_api/patient_list.php'));
+      final response = await http.get(Uri.parse('http://your_api_url/patient_list.php'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         setState(() {
@@ -69,36 +82,30 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
   Future<void> _fetchAlarmData({String? patientId}) async {
     String url;
     if (patientId == null) {
-      // Fetch all alarms if patientId is null
-      url = 'http://192.168.1.9/alarm/alarm_api/get_alarm.php?role=$userRole';
+      url = 'http://your_api_url/get_alarm.php?role=$userRole';
     } else {
-      // Fetch alarms for the specific patient
-      url = 'http://192.168.1.9/alarm/alarm_api/get_alarm.php?patient_id=$patientId&role=$userRole';
+      url = 'http://your_api_url/get_alarm.php?patient_id=$patientId&role=$userRole';
     }
 
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('Alarm Data: $data'); // Debugging statement
-
         if (data is List && data.isNotEmpty) {
           setState(() {
             alarmData = data.map((item) => {
               'patient_name': item['patient_name'],
-              'medicine_name': item['pill_name'], // This should match the alias
+              'medicine_name': item['pill_name'],
               'time': item['time'],
               'reminder_message': item['reminder_message'],
               'status_remark': item['status_remark'],
-            } as Map<String, dynamic>).toList();
-            hasNoAlarms = false; // Reset flag when alarms are present
-            print('Alarms available');
+            }).toList();
+            hasNoAlarms = false;
           });
         } else {
           setState(() {
             alarmData = [];
-            hasNoAlarms = true; // Set flag when no alarms are found
-            print('No alarms found');
+            hasNoAlarms = true;
           });
         }
       } else {
@@ -111,10 +118,8 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
 
   void _onNameButtonPressed(String name, String? patientId) {
     if (patientId == null) {
-      // Fetch all alarms if "All" button is pressed
       _fetchAlarmData();
     } else {
-      // Fetch alarms for the selected patient
       _fetchAlarmData(patientId: patientId);
     }
   }
@@ -123,86 +128,157 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Color(0xFF26394A),
         leading: IconButton(
-          icon: Icon(Icons.menu),
+          icon: Icon(Icons.menu, color: Colors.white),
           onPressed: () {
             _scaffoldKey.currentState!.openDrawer();
           },
         ),
-        title: Text('PillCare'),
+
       ),
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
         userRole: userRole,
       ),
-      body: Column(
-        children: [
-          // Scrollable Names List including "All" button
-          Container(
-            height: 50,
-            color: Colors.grey[200],
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: patientData.length + 1, // +1 for "All" button
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return _buildNameButton("All", null);
-                } else {
-                  return _buildNameButton(
-                    patientData[index - 1]['patient_name'],
-                    patientData[index - 1]['patient_id'],
-                  );
-                }
-              },
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF39cdaf), Color(0xFF26394A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          Expanded(
-            child: hasNoAlarms
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        ),
+        child: Column(
+          children: [
+            Container(
+              height: 60,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: patientData.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return _buildNameButton("All", null);
+                  } else {
+                    return _buildNameButton(
+                      patientData[index - 1]['patient_name'],
+                      patientData[index - 1]['patient_id'],
+                    );
+                  }
+                },
+              ),
+            ),
+            Expanded(
+              child: hasNoAlarms
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_today, size: 150, color: Colors.blue),
+                    SizedBox(height: 20),
+                    Text(
+                      "You don’t have any medicine",
+                      style: TextStyle(fontSize: 20, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              )
+                  : ListView.builder(
+                itemCount: alarmData.length,
+                itemBuilder: (context, index) {
+                  return _buildAlarmCard(alarmData[index]);
+                },
+              ),
+            ),
+            // Aligning SpeedDial to the right side of the screen
+            Align(
+              alignment: Alignment.bottomRight,
+              child: SpeedDial(
+                animatedIcon: AnimatedIcons.menu_close,
+                animatedIconTheme: IconThemeData(size: 22.0),
+                backgroundColor: Color(0xFF26394A),
+                foregroundColor: Colors.white,
+                onOpen: () => print('Speed dial opened'),
+                onClose: () => print('Speed dial closed'),
                 children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 150,
-                    color: Colors.blue,
+                  SpeedDialChild(
+                    child: Icon(Icons.lock_clock),
+                    label: 'Make Alarm',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => AlarmScreen()),
+                      );
+                    },
                   ),
-                  SizedBox(height: 20),
-                  Text(
-                    "You don’t have any medicine",
-                    style: TextStyle(fontSize: 20, color: Colors.grey),
+                  SpeedDialChild(
+                    child: Icon(Icons.medical_information),
+                    label: 'Add Medicine',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => MedicineScreen()),
+                      );
+                    },
+                  ),
+                  SpeedDialChild(
+                    child: Icon(Icons.family_restroom),
+                    label: 'Add Family Members',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => PatientScreen()),
+                      );
+                    },
+                  ),
+                  SpeedDialChild(
+                    child: Icon(Icons.history),
+                    label: 'Medicine History',
+                    //onTap: () {
+                      // Trigger the Medicine History screen
+                    //  Navigator.push(
+                     //   context,
+                    //    MaterialPageRoute(builder: (context) => MedicineHistoryScreen()),
+                    //  );
+                //    },
                   ),
                 ],
               ),
-            )
-                : ListView.builder(
-              itemCount: alarmData.length,
-              itemBuilder: (context, index) {
-                return _buildAlarmCard(alarmData[index]);
-              },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+
   Widget _buildNameButton(String name, String? patientId) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.only(top: 10, left: 10, right: 10), // Add top margin
       child: ElevatedButton(
         onPressed: () {
           _onNameButtonPressed(name, patientId);
         },
+        style: ElevatedButton.styleFrom(
+          foregroundColor: Colors.black, // Set text color to black
+          backgroundColor: Colors.white, // Set background color to white
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(5), // Apply a smaller borderRadius
+          ),
+        ),
         child: Text(name),
       ),
     );
   }
 
+
+
   Widget _buildAlarmCard(Map<String, dynamic> alarm) {
     return Card(
+      color: Colors.transparent,
       margin: EdgeInsets.all(10),
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -213,23 +289,16 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Row for Icon and Medicine Name
             Row(
               children: [
-                // Medicine Icon
-                Icon(
-                  Icons.medication,  // Medicine icon
-                  size: 60,
-                  color: Colors.blueAccent, // You can change the color as needed
-                ),
+                Icon(Icons.medication, size: 60, color: Colors.white),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    alarm['medicine_name'], // Medicine name
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    alarm['medicine_name'],
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
-                // Close button (optional)
                 IconButton(
                   icon: Icon(Icons.roller_shades_closed_rounded, color: Colors.red),
                   onPressed: () {
@@ -239,31 +308,23 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
               ],
             ),
             SizedBox(height: 8),
-
-            // Text for instructions
             Text(
-              alarm['reminder_message'], // Static instruction (you can customize)
-              style: TextStyle(fontSize: 16),
+              alarm['reminder_message'],
+              style: TextStyle(fontSize: 16, color: Colors.white),
             ),
             SizedBox(height: 10),
-
-            // Row for times a day and number of pills
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.access_time, size: 18, color: Colors.grey),
-                SizedBox(width: 5),
                 Text(
-                    alarm['time'],
-                    style: TextStyle(fontSize: 16)),
-                SizedBox(width: 15),
+                  'Time: ${alarm['time']}',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+                Text(
+                  'Status: ${alarm['status_remark']}',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ],
-            ),
-            SizedBox(height: 10),
-
-            // Status like "Pending"
-            Text(
-              alarm['status_remark'],
-              style: TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ],
         ),

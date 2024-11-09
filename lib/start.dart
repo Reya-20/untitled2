@@ -4,78 +4,110 @@ import 'dart:convert';
 import 'register.dart'; // Import your registration screen
 import 'user/user_dashboard.dart'; // Import user dashboard
 import 'caregiver/caregiver_dashboard.dart'; // Import caregiver dashboard
+import 'dart:async'; // For Timer functionality
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final _emailController = TextEditingController();
-    final _passwordController = TextEditingController();
-    final ValueNotifier<String?> _errorMessage = ValueNotifier<String?>(null);
+  _LoginScreenState createState() => _LoginScreenState();
+}
 
-    Future<void> _login() async {
-      final email = _emailController.text;
-      final password = _passwordController.text;
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final ValueNotifier<String?> _errorMessage = ValueNotifier<String?>(null);
+  Timer? _errorTimer;
+  bool _isLoading = false;
 
-      // Check if email and password are provided
-      if (email.isEmpty || password.isEmpty) {
-        _errorMessage.value = 'Email and password cannot be empty';
-        // Reset error message after 5 seconds
-        Future.delayed(Duration(seconds: 5), () {
-          _errorMessage.value = null;
-        });
-        return;
-      }
+  // Email validation
+  String? _validateEmail(String? value) {
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    if (value == null || value.isEmpty) {
+      return 'Please enter an email';
+    } else if (!emailRegex.hasMatch(value)) {
+      return 'Invalid email format';
+    }
+    return null;
+  }
 
-      // Prepare the API request
-      try {
-        final response = await http.post(
-          Uri.parse('http://192.168.1.9/alarm/account_api/login.php'), // Your API URL
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'username': email, 'password': password}),
-        );
+  Future<void> _login() async {
+    final email = _emailController.text;
+    final password = _passwordController.text;
 
-        if (response.statusCode == 200) {
-          final result = jsonDecode(response.body);
-          if (result['success']) {
-            // Navigate based on role
-            if (result['role'] == '0') {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => HomeScreen()), // User Dashboard
-              );
-            } else if (result['role'] == '1') {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => HomeCareScreen()), // Caregiver Dashboard
-              );
-            }
-          } else {
-            // Show error message if login fails
-            _errorMessage.value = result['message'];
-            // Reset error message after 5 seconds
-            Future.delayed(Duration(seconds: 5), () {
-              _errorMessage.value = null;
-            });
-          }
-        } else {
-          // Handle unexpected response
-          _errorMessage.value = 'Error: ${response.statusCode}';
-          // Reset error message after 5 seconds
-          Future.delayed(Duration(seconds: 5), () {
-            _errorMessage.value = null;
-          });
-        }
-      } catch (e) {
-        _errorMessage.value = 'Failed to connect to the server';
-        // Reset error message after 5 seconds
-        Future.delayed(Duration(seconds: 5), () {
-          _errorMessage.value = null;
-        });
-      }
+    // Check if email and password are provided
+    if (email.isEmpty || password.isEmpty) {
+      _setErrorMessage('Email and password cannot be empty');
+      return;
     }
 
+    setState(() {
+      _isLoading = true; // Show loading indicator
+    });
+
+    // Prepare the API request
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.9/alarm/account_api/login.php'), // Your API URL
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': email, 'password': password}),
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result['success']) {
+          // Navigate based on role
+          if (result['role'] == '0') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomeScreen()), // User Dashboard
+            );
+          } else if (result['role'] == '1') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomeCareScreen()), // Caregiver Dashboard
+            );
+          }
+        } else {
+          _setErrorMessage(result['message']);
+        }
+      } else {
+        _setErrorMessage('Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _setErrorMessage('Failed to connect to the server');
+    } finally {
+      setState(() {
+        _isLoading = false; // Hide loading indicator
+      });
+    }
+  }
+
+  // Function to handle error message reset after delay
+  void _setErrorMessage(String message) {
+    if (_errorTimer != null && _errorTimer!.isActive) {
+      _errorTimer!.cancel();
+    }
+
+    _errorMessage.value = message;
+    _errorTimer = Timer(Duration(seconds: 5), () {
+      setState(() {
+        _errorMessage.value = null;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _errorMessage.dispose();
+    _errorTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -132,7 +164,7 @@ class LoginScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(10),
                       margin: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.8), // Background color for error message
+                        color: Colors.redAccent.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -146,8 +178,9 @@ class LoginScreen extends StatelessWidget {
                 const SizedBox(height: 30),
 
                 // Email Input Field
-                TextField(
+                TextFormField(
                   controller: _emailController,
+                  validator: _validateEmail,
                   decoration: InputDecoration(
                     labelText: 'Email',
                     labelStyle: TextStyle(color: Colors.white),
@@ -182,7 +215,7 @@ class LoginScreen extends StatelessWidget {
 
                 // Login Button
                 ElevatedButton(
-                  onPressed: _login,
+                  onPressed: _isLoading ? null : _login, // Disable button during loading
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
@@ -191,7 +224,9 @@ class LoginScreen extends StatelessWidget {
                     ),
                     elevation: 8,
                   ),
-                  child: const Text(
+                  child: _isLoading
+                      ? CircularProgressIndicator(color: Color(0xFF26394A)) // Show spinner during loading
+                      : const Text(
                     'Login',
                     style: TextStyle(
                       fontSize: 20,
