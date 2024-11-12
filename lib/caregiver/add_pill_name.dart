@@ -27,12 +27,12 @@ class MedicineScreen extends StatefulWidget {
 class _MedicineScreenState extends State<MedicineScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _medicineController = TextEditingController();
+  final TextEditingController _medicineCountController = TextEditingController(); // Controller for medicine count
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
   List<String> _medicineList = [];
   int userRole = 1; // Set user role (0 or 1) based on your logic
   int? selectedContainer; // Variable to hold selected container number
-  int _medicineCount = 0; // Medicine count for the dialog
 
   @override
   void initState() {
@@ -42,7 +42,8 @@ class _MedicineScreenState extends State<MedicineScreen> {
 
   // Function to fetch medicines from the server
   Future<void> _fetchMedicines() async {
-    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/pill_api/get_pill.php'); // Replace with your actual URL
+    final url = Uri.parse(
+        'http://springgreen-rhinoceros-308382.hostingersite.com/pill_api/get_pill.php'); // Replace with your actual URL
 
     try {
       final response = await http.get(url);
@@ -50,7 +51,8 @@ class _MedicineScreenState extends State<MedicineScreen> {
       if (response.statusCode == 200) {
         final List<dynamic> responseData = json.decode(response.body);
         setState(() {
-          _medicineList = responseData.map((pill) => pill['pill_name'].toString()).toList();
+          _medicineList =
+              responseData.map((pill) => pill['pill_name'].toString()).toList();
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -66,45 +68,61 @@ class _MedicineScreenState extends State<MedicineScreen> {
     }
   }
 
-  // Function to add medicine locally and send data to server
   void _addMedicine() async {
-    if (_medicineController.text.isNotEmpty && selectedContainer != null) {
+    if (_medicineController.text.isNotEmpty &&
+        _medicineCountController.text.isNotEmpty &&
+        selectedContainer != null) {
       String medicineName = _medicineController.text;
 
-      // Add medicine locally
-      setState(() {
-        _medicineList.add(medicineName);
-        _medicineController.clear();
-        selectedContainer = null; // Reset the selected container after adding
-      });
+      // Validate the medicine count input
+      int medicineCount;
+      try {
+        medicineCount = int.parse(_medicineCountController.text); // Try to parse the count as an integer
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Please enter a valid number for medicine count'),
+          backgroundColor: Colors.red,
+        ));
+        return; // Exit the method if the input is invalid
+      }
 
       // Upload medicine to the server
-      await uploadMedicines([medicineName]); // Send a list with the new medicine
+      bool success = await uploadMedicines([medicineName], medicineCount, selectedContainer!);
+
+      // If the upload is successful, add the medicine to the list
+      if (success) {
+        setState(() {
+          _medicineList.add(medicineName);
+          _medicineController.clear();
+          _medicineCountController.clear(); // Clear the medicine count input
+          selectedContainer = null; // Reset the selected container after adding
+        });
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please enter medicine name and select a container'),
+        content: Text('Please enter medicine name, count, and select a container'),
         backgroundColor: Colors.red,
       ));
     }
   }
 
   // Function to upload medicine names to the server
-  Future<void> uploadMedicines(List<String> medicineNames) async {
-    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/pill_api/post_pill.php'); // Replace with your actual URL
+  Future<bool> uploadMedicines(List<String> medicineNames, int pillCount, int container) async {
+    final url = Uri.parse(
+        'http://springgreen-rhinoceros-308382.hostingersite.com/post_pill.php'); // Replace with your actual URL
 
     try {
       final response = await http.post(
         url,
         body: {
-          'medicine_names': json.encode(medicineNames), // Send the list as JSON
+          'medicine_name': medicineNames[0], // Send single medicine name
+          'pill_count': pillCount.toString(), // Include pill count
+          'container': container.toString(), // Include selected container
         },
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       );
-
-      print('Response status: ${response.statusCode}'); // Log response status
-      print('Response body: ${response.body}'); // Log response body
 
       if (response.statusCode == 200) {
         final responseBody = json.decode(response.body);
@@ -113,23 +131,27 @@ class _MedicineScreenState extends State<MedicineScreen> {
             content: Text('Medicine added successfully!'),
             backgroundColor: Colors.green,
           ));
+          return true;
         } else {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Error: ${responseBody['message']}'),
             backgroundColor: Colors.red,
           ));
+          return false;
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Server error: ${response.statusCode}'),
           backgroundColor: Colors.red,
         ));
+        return false;
       }
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error: $error'),
         backgroundColor: Colors.red,
       ));
+      return false;
     }
   }
 
@@ -141,94 +163,99 @@ class _MedicineScreenState extends State<MedicineScreen> {
     // You can also make a server call here to delete the item from the server if needed
   }
 
-  // Function to show the dialog with a dropdown for container selection
   void _showDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("Add Medicine"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _medicineController,
-                decoration: InputDecoration(
-                  labelText: 'Enter Medicine Name',
-                  labelStyle: TextStyle(color: Colors.black),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.black),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.black),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.black),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15), // Rounded corners for the dialog
+          ),
+          title: Text(
+            "Add Medicine",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Medicine name input
+                TextField(
+                  controller: _medicineController,
+                  decoration: InputDecoration(
+                    labelText: 'Enter Medicine Name',
+                    labelStyle: TextStyle(color: Colors.black),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Medicine Count:'),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.remove),
-                        onPressed: () {
-                          setState(() {
-                            if (_medicineCount > 0) _medicineCount--;
-                          });
-                        },
-                      ),
-                      Text('$_medicineCount'),
-                      IconButton(
-                        icon: Icon(Icons.add),
-                        onPressed: () {
-                          setState(() {
-                            _medicineCount++;
-                          });
-                        },
-                      ),
-                    ],
+                SizedBox(height: 16),
+
+                // Medicine count input (as an input field)
+                TextField(
+                  controller: _medicineCountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Enter Medicine Count',
+                    labelStyle: TextStyle(color: Colors.black),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
                   ),
-                ],
-              ),
-              SizedBox(height: 16),
-              DropdownButton<int>(
-                value: selectedContainer,
-                hint: Text("Select Container"),
-                items: List.generate(5, (index) {
-                  return DropdownMenuItem<int>(
-                    value: index + 1,
-                    child: Text('Container ${index + 1}'),
-                  );
-                }),
-                onChanged: (int? newValue) {
-                  setState(() {
-                    selectedContainer = newValue;
-                  });
-                },
-              ),
-            ],
+                ),
+                SizedBox(height: 16),
+
+                // Container selection dropdown
+                DropdownButton<int>(
+                  value: selectedContainer,
+                  hint: Text("Select Container"),
+                  isExpanded: true, // Make the dropdown fill the available space
+                  items: List.generate(5, (index) {
+                    return DropdownMenuItem<int>(
+                      value: index + 1,
+                      child: Text('Container ${index + 1}'),
+                    );
+                  }),
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      selectedContainer = newValue;
+                    });
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
+            // Cancel button
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(); // Close the dialog
               },
-              child: Text("Cancel"),
+              child: Text(
+                "Cancel",
+                style: TextStyle(color: Color(0xFF39cdaf)),
+              ),
             ),
+            // Add button
             TextButton(
               onPressed: () {
                 _addMedicine(); // Add the medicine when this is pressed
                 Navigator.of(context).pop(); // Close the dialog
               },
-              child: Text("Add"),
+              child: Text(
+                "Add",
+                style: TextStyle(color: Color(0xFF39cdaf)),
+              ),
             ),
           ],
         );
@@ -258,63 +285,58 @@ class _MedicineScreenState extends State<MedicineScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF39cdaf), Color(0xFF26394A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              Color(0xFF39cdaf), // Mint Green
+              Color(0xFF0E4C92), // Navy Blue
+            ],
           ),
         ),
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
+          padding: EdgeInsets.all(16),
           children: [
-            // New Layout with 5 Containers
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, // 2 cards per row
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+            ElevatedButton(
+              onPressed: _showDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF39cdaf), // Custom color
+                padding: EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  return Card(
-                    elevation: 8, // More pronounced shadow
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        color: Color(0xFF26394A), // Soft container background
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Container ${index + 1}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+              ),
+              child: Text(
+                "Add Medicine",
+                style: TextStyle(fontSize: 18),
               ),
             ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: ElevatedButton(
-                onPressed: _showDialog, // Show the dialog when pressed
-                child: Icon(Icons.add),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF39cdaf),
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            SizedBox(height: 20),
+            Text(
+              'Medicine List:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            _medicineList.isEmpty
+                ? Text('No medicines added yet')
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: _medicineList.length,
+              itemBuilder: (context, index) {
+                return Dismissible(
+                  key: Key(_medicineList[index]),
+                  onDismissed: (direction) {
+                    _deleteMedicine(index); // Delete the medicine when swiped
+                  },
+                  background: Container(color: Colors.red),
+                  child: ListTile(
+                    title: Text(
+                      _medicineList[index],
+                      style: TextStyle(fontSize: 18),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),

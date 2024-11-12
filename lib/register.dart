@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'login.dart';
+import 'start.dart';
 
 void main() {
   runApp(MyApp());
@@ -72,7 +72,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     };
 
     final response = await http.post(
-      Uri.parse('http://192.168.1.9/alarm/account_api/register.php'),
+      Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/register.php'),
       body: data,
     );
 

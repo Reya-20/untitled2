@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       print('Attempting to log in with username: $username and password: $password');
       final response = await http.post(
-        Uri.parse('http://192.168.1.9/alarm/account_api/login.php'), // Your API URL
+        Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com//login.php'), // Your API URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username, 'password': password}),
       );
