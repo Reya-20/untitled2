@@ -10,6 +10,7 @@ class SplashScreen extends StatelessWidget {
     Future.delayed(const Duration(seconds: 8), () {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const LoginScreen()),
+
       );
     });
 
@@ -29,8 +30,8 @@ class SplashScreen extends StatelessWidget {
               // Static image at the center
               Image.asset(
                 'asset/image/splash.gif', // Update with your image path
-                height: 150, // Adjust the size as needed
-                width: 150,
+                height: 180, // Adjust the size as needed
+                width: 180,
               ),
               const SizedBox(height: 20),
               // App Name

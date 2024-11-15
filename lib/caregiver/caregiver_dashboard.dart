@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart'; // Calendar package
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../include/sidebar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart'; // Import Speed Dial package
+import 'package:flutter_speed_dial/flutter_speed_dial.dart'; // Speed Dial package
 import 'add_patient_name.dart';
 import 'add_pill_name.dart';
 import 'add_pill_dashboard.dart';
@@ -39,17 +40,17 @@ class HomeCareScreen extends StatefulWidget {
 
 class _HomeCareScreenState extends State<HomeCareScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+  FlutterLocalNotificationsPlugin();
   int userRole = 1;
-  List<Map<String, dynamic>> patientData = [];
   List<Map<String, dynamic>> alarmData = [];
   bool hasNoAlarms = false;
+  DateTime selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _getUserRole();
-    _fetchPatientNames();
     _fetchAlarmData();
   }
 
@@ -60,31 +61,13 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
     });
   }
 
-  Future<void> _fetchPatientNames() async {
-    try {
-      final response = await http.get(Uri.parse('http://your_api_url/patient_list.php'));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        setState(() {
-          patientData = data.map((item) => {
-            'patient_id': item['patient_id'],
-            'patient_name': item['patient_name']
-          }).toList();
-        });
-      } else {
-        print('Failed to load patient names: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching patient names: $e');
-    }
-  }
-
   Future<void> _fetchAlarmData({String? patientId}) async {
     String url;
     if (patientId == null) {
       url = 'http://your_api_url/get_alarm.php?role=$userRole';
     } else {
-      url = 'http://your_api_url/get_alarm.php?patient_id=$patientId&role=$userRole';
+      url =
+      'http://your_api_url/get_alarm.php?patient_id=$patientId&role=$userRole';
     }
 
     try {
@@ -93,13 +76,16 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
         final data = json.decode(response.body);
         if (data is List && data.isNotEmpty) {
           setState(() {
-            alarmData = data.map((item) => {
+            alarmData = data
+                .map((item) =>
+            {
               'patient_name': item['patient_name'],
               'medicine_name': item['pill_name'],
               'time': item['time'],
               'reminder_message': item['reminder_message'],
               'status_remark': item['status_remark'],
-            }).toList();
+            })
+                .toList();
             hasNoAlarms = false;
           });
         } else {
@@ -116,12 +102,24 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
     }
   }
 
-  void _onNameButtonPressed(String name, String? patientId) {
-    if (patientId == null) {
-      _fetchAlarmData();
-    } else {
-      _fetchAlarmData(patientId: patientId);
-    }
+  void _showNotificationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('New Notification'),
+          content: Text('This is a notification message.'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -129,16 +127,6 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Color(0xFF26394A),
-        leading: IconButton(
-          icon: Icon(Icons.menu, color: Colors.white),
-          onPressed: () {
-            _scaffoldKey.currentState!.openDrawer();
-          },
-        ),
-
-      ),
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
@@ -154,23 +142,65 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
         ),
         child: Column(
           children: [
-            Container(
-              height: 60,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: patientData.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return _buildNameButton("All", null);
-                  } else {
-                    return _buildNameButton(
-                      patientData[index - 1]['patient_name'],
-                      patientData[index - 1]['patient_id'],
-                    );
-                  }
-                },
+            // Row to include the menu button before the calendar
+            Padding(
+              padding: const EdgeInsets.only(top: 40, left: 10),
+              // Positioning button
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.menu, color: Colors.white),
+                    onPressed: () {
+                      _scaffoldKey.currentState?.openDrawer();
+                    },
+                  ),
+                  Spacer(),
+                  // Notification button
+                  IconButton(
+                    icon: Icon(Icons.notifications, color: Colors.white),
+                    onPressed: _showNotificationDialog,
+                  ),
+                ],
               ),
             ),
+
+            // Add space between menu button and calendar
+            SizedBox(height: 5),
+
+            // Calendar Widget
+            TableCalendar(
+              firstDay: DateTime.utc(2000),
+              lastDay: DateTime.utc(2100),
+              focusedDay: selectedDate,
+              calendarFormat: CalendarFormat.month,
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  selectedDate = selectedDay;
+                });
+                // Optionally, filter alarms based on `selectedDate`
+              },
+              selectedDayPredicate: (day) => isSameDay(day, selectedDate),
+              calendarStyle: CalendarStyle(
+                selectedDecoration: BoxDecoration(
+                  color: Color(0xFF26394A),
+                  shape: BoxShape.circle,
+                ),
+                todayDecoration: BoxDecoration(
+                  color: Color(0xFF39cdaf),
+                  shape: BoxShape.circle,
+                ),
+                defaultTextStyle: TextStyle(color: Colors.white),
+                // Make calendar text white
+                todayTextStyle: TextStyle(color: Colors.white),
+                // Make today's date text white
+                selectedTextStyle: TextStyle(
+                    color: Colors.white), // Make selected day text white
+              ),
+            ),
+
+            SizedBox(height: 20), // Add space between calendar and card
+
+            // Alarm List
             Expanded(
               child: hasNoAlarms
                   ? Center(
@@ -186,147 +216,113 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                   ],
                 ),
               )
-                  : ListView.builder(
-                itemCount: alarmData.length,
-                itemBuilder: (context, index) {
-                  return _buildAlarmCard(alarmData[index]);
-                },
-              ),
-            ),
-            // Aligning SpeedDial to the right side of the screen
-            Align(
-              alignment: Alignment.bottomRight,
-              child: SpeedDial(
-                animatedIcon: AnimatedIcons.menu_close,
-                animatedIconTheme: IconThemeData(size: 22.0),
-                backgroundColor: Color(0xFF26394A),
-                foregroundColor: Colors.white,
-                onOpen: () => print('Speed dial opened'),
-                onClose: () => print('Speed dial closed'),
-                children: [
-                  SpeedDialChild(
-                    child: Icon(Icons.lock_clock),
-                    label: 'Make Alarm',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => AlarmScreen()),
-                      );
-                    },
+                  : Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(50), // Rounded top left corner
+                    topRight: Radius.circular(50), // Rounded top right corner
                   ),
-                  SpeedDialChild(
-                    child: Icon(Icons.medical_information),
-                    label: 'Add Medicine',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MedicineScreen()),
-                      );
-                    },
-                  ),
-                  SpeedDialChild(
-                    child: Icon(Icons.family_restroom),
-                    label: 'Add Family Members',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => PatientScreen()),
-                      );
-                    },
-                  ),
-                  SpeedDialChild(
-                    child: Icon(Icons.history),
-                    label: 'Medicine History',
-                    //onTap: () {
-                      // Trigger the Medicine History screen
-                    //  Navigator.push(
-                     //   context,
-                    //    MaterialPageRoute(builder: (context) => MedicineHistoryScreen()),
-                    //  );
-                //    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildNameButton(String name, String? patientId) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10, left: 10, right: 10), // Add top margin
-      child: ElevatedButton(
-        onPressed: () {
-          _onNameButtonPressed(name, patientId);
-        },
-        style: ElevatedButton.styleFrom(
-          foregroundColor: Colors.black, // Set text color to black
-          backgroundColor: Colors.white, // Set background color to white
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(5), // Apply a smaller borderRadius
-          ),
-        ),
-        child: Text(name),
-      ),
-    );
-  }
-
-
-
-  Widget _buildAlarmCard(Map<String, dynamic> alarm) {
-    return Card(
-      color: Colors.transparent,
-      margin: EdgeInsets.all(10),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.medication, size: 60, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    alarm['medicine_name'],
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+                  color: Color(0xEAEBEBEF),
                 ),
-                IconButton(
-                  icon: Icon(Icons.roller_shades_closed_rounded, color: Colors.red),
-                  onPressed: () {
-                    // Handle delete logic
+                child: ListView.builder(
+                  itemCount: alarmData.length,
+                  itemBuilder: (context, index) {
+                    return _buildAlarmCard(alarmData[index]);
                   },
                 ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Text(
-              alarm['reminder_message'],
-              style: TextStyle(fontSize: 16, color: Colors.white),
-            ),
-            SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Time: ${alarm['time']}',
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
-                Text(
-                  'Status: ${alarm['status_remark']}',
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
-              ],
+              ),
             ),
           ],
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      // Adjust position
+      floatingActionButton: SpeedDial(
+        icon: Icons.add,
+        backgroundColor: Color(0xFF26394A),
+        children: [
+          SpeedDialChild(
+            child: Icon(Icons.medical_information),
+            label: 'Add Pill',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MedicineScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.person_add),
+            label: 'Add Patient',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PatientScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.lock_clock),
+            label: 'Make Alarm Reminder',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PatientScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.history),
+            label: 'Medicine History',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PatientScreen()),
+              );
+            },
+          ),
+
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlarmCard(Map<String, dynamic> alarm) {
+    return Padding(
+      padding: const EdgeInsets.all(10.0),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20), // More rounded corners
+          color: Colors.white,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Only show the "Today" label if alarm data is available
+              if (alarm != null) // Check if there is alarm data
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  // Adds space below "Today"
+                  child: Text(
+                    'Today',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.blue, // You can change the color here
+                    ),
+                  ),
+                ),
+              // Alarm details
+              Text("Patient: ${alarm['patient_name']}"),
+              Text("Medicine: ${alarm['medicine_name']}"),
+              Text("Time: ${alarm['time']}"),
+              Text("Reminder: ${alarm['reminder_message']}"),
+              Text("Status: ${alarm['status_remark']}"),
+            ],
+          ),
         ),
       ),
     );
