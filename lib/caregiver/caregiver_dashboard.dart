@@ -268,7 +268,7 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => PatientScreen()),
+                MaterialPageRoute(builder: (context) => AlarmScreen()),
               );
             },
           ),

@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'add_pill_dashboard.dart';
-import 'add_pill_name.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../include/sidebar.dart';
 
@@ -16,8 +14,7 @@ class _PatientScreenState extends State<PatientScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   List<Map<String, dynamic>> _patientList = [];
   int userRole = 1; // Set user role (0 or 1) based on your logic
 
@@ -28,7 +25,7 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _fetchPatients() async {
-    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/patient_api/get_patient.php');
+    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/patient_api/get_patient.php');
 
     try {
       final response = await http.get(url);
@@ -81,19 +78,17 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _uploadPatient(String name, String username, String password) async {
-    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/patient_api/post_patient.php');
+    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/post_patient.php'); // Updated to HTTPS
 
     try {
       final response = await http.post(
         url,
+        headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'patient_name': name,
           'username': username,
           'password': password,
         }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
       );
 
       if (response.statusCode == 200) {
