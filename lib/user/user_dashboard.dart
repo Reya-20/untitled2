@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart'; // Import for date formatting
 import 'dart:async'; // Import for Timer
+import 'dart:ui'; // For BackdropFilter
+
 
 void main() {
   runApp(MyApp());
@@ -51,44 +53,63 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchAlarmData() async {
-    String url = 'http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/getalarm.php'; // Ensure the correct URL
-
     try {
-      print('Fetching alarm data...');
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(
+          'https://springgreen-rhinoceros-308382.hostingersite.com/get_alarm.php'));
+
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('Data fetched: $data'); // Print fetched data
-        if (data is List) {
+        // Log the response body to see the structure
+        print('Response body: ${response.body}');
+
+        // Decode the JSON response into a Map
+        final Map<String, dynamic> data = json.decode(response.body);
+
+        // Check if the 'success' key exists and if the 'data' key is a list
+        if (data['success'] == true && data['data'] is List) {
           setState(() {
-            alarmData = data.map((item) => {
-              'id': item['id'] ?? 0, // Make sure to include the id
-              'patient_name': item['patient_name'] ?? 'Unknown',
-              'medicine_name': item['pill_name'] ?? 'No Name',
-              'time': item['time'] ?? 'Not Set',
-              'reminder_message': item['reminder_message'] ?? 'No Message',
-              'status_remark': item['status_remark'] ?? 'Pending',
-            }).toList();
-            hasNoAlarms = alarmData.isEmpty; // Update flag based on data
-            _alarms = alarmData.cast<Map<String, dynamic>>(); // Cast to List<Map<String, dynamic>>
+            // Format the time for each alarm to 12-hour format with AM/PM
+            _alarms =
+                List<Map<String, dynamic>>.from(data['data']).map((alarm) {
+                  // Ensure no null values are being used, provide default values where necessary
+
+                  String time = alarm['formatted_time'] ?? '00:00 AM'; // Provide default time if null
+                  String reminderMessage = alarm['reminder_message'] ?? ''; // Provide empty string if null
+                  String patientName = alarm['patient_name'] ?? 'Unknown'; // Provide default name if null
+                  String pillName = alarm['pill_name'] ?? 'Unknown Pill'; // Provide default pill name if null
+
+                  return {
+                    'id': alarm['id'],
+                    'time': time, // Time is already formatted in the response
+                    'reminder_message': reminderMessage,
+                    'patient_name': patientName,
+                    'pill_name': pillName,
+                  };
+                }).toList();
+            alarmData = _alarms;
+            hasNoAlarms = alarmData.isEmpty;
           });
-          if (!hasNoAlarms) {
-            _startCheckingTime(); // Start checking time only if there are alarms
-          }
         } else {
-          print('No alarm data found');
+          // Handle the case where the response data doesn't match the expected format
+          print(
+              'Error: Expected a list of alarms but found something else or success is false.');
           setState(() {
-            alarmData = [];
-            hasNoAlarms = true; // Set flag when no alarms are found
+            _alarms = []; // Reset the alarms list if the data is not valid
           });
         }
       } else {
-        print('Failed to load alarm data: ${response.statusCode}');
+        print('Failed to load reminders. HTTP status: ${response.statusCode}');
+        setState(() {
+          _alarms = []; // Reset the alarms list in case of failure
+        });
       }
     } catch (e) {
-      print('Error fetching alarm data: $e');
+      print('Error fetching reminders: $e');
+      setState(() {
+        _alarms = []; // Reset the alarms list in case of error
+      });
     }
   }
+
 
   Future<void> _startCheckingTime() async {
     print('Start checking time...'); // This line will output to the terminal
@@ -291,82 +312,198 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.menu),
-          onPressed: () {
-            _scaffoldKey.currentState!.openDrawer();
-          },
-        ),
-        title: Text('PillCare'),
-      ),
+      backgroundColor: Colors.transparent,
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
         userRole: userRole,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          hasNoAlarms
-              ? Center(child: Text("No alarms found"))
-              : Expanded(
-            child: ListView.builder(
-              itemCount: alarmData.length,
-              itemBuilder: (context, index) {
-                return _buildAlarmCard(alarmData[index]);
-              },
+          // Background with gradient and transparent circles
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF39cdaf), Color(0xFF26394A)], // Gradient colors
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
+          ),
+          // Adding transparent circles
+          Positioned(
+            top: 50,
+            left: 30,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            right: 50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.15),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 200,
+            right: 20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
+              ),
+            ),
+          ),
+          // Main content
+          Column(
+            children: [
+              // Row to include the menu button
+              Padding(
+                padding: const EdgeInsets.only(top: 40, left: 10),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.menu, color: Colors.white),
+                      onPressed: () {
+                        _scaffoldKey.currentState?.openDrawer();
+                      },
+                    ),
+                    Spacer(),
+                    // Add other buttons here if needed
+                  ],
+                ),
+              ),
+              // Add a sidebox or any widget after the row
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16),
+                color: Colors.white.withOpacity(0.5),
+
+              ),
+              // Alarm content
+              Expanded(
+                child: hasNoAlarms
+                    ? Center(
+                  child: Text(
+                    "No alarms found",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                )
+                    : ListView.builder(
+                  itemCount: alarmData.length,
+                  itemBuilder: (context, index) {
+                    return _buildAlarmCard(alarmData[index]);
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
+
   Widget _buildAlarmCard(Map<String, dynamic> alarm) {
-    return Card(
-      margin: EdgeInsets.all(10),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.medication, size: 60, color: Colors.blueAccent),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    alarm['medicine_name'] ?? 'No Name', // Default if null
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+      child: Card(
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        color: Colors.blue.shade50, // Lighter shade for a softer background
+        child: Padding(
+          padding: const EdgeInsets.all(16.0), // Add some padding inside the card
+          child: Row(
+            children: [
+              // Icon for Pill
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF39cdaf), // Matching color with the theme
                 ),
-                IconButton(
-                  icon: Icon(Icons.roller_shades_closed_rounded, color: Colors.red),
-                  onPressed: () {
-                    // Handle delete logic
-                  },
+                child: Icon(
+                  Icons.medical_services,
+                  color: Colors.white,
+                  size: 24,
                 ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Text(alarm['reminder_message'] ?? 'No Message', style: TextStyle(fontSize: 16)),
-            SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 18, color: Colors.grey),
-                SizedBox(width: 5),
-                Text(alarm['time'] ?? 'Not Set', style: TextStyle(fontSize: 16)),
-              ],
-            ),
-            SizedBox(height: 10),
-            Text(alarm['status_remark'] ?? 'Pending', style: TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.bold)),
-          ],
+              ),
+              SizedBox(width: 16), // Space between the icon and the text
+
+              // Main Text Column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${alarm['pill_name']} for ${alarm['patient_name']}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 6), // Space between title and subtitle
+                    Text(
+                      'Reminder: ${alarm['reminder_message']}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Time Text
+              Text(
+                _formatTime(alarm['time']),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF39cdaf), // Matching time color to theme
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  String _formatTime(String time) {
+    try {
+      // Trim any leading or trailing spaces
+      time = time.trim();
+
+      // Use the DateFormat("h:mm a") to parse the time in 12-hour AM/PM format
+      DateFormat format = DateFormat("h:mm a");
+
+      // Parse the time string to DateTime
+      DateTime alarmDate = format.parse(time);
+
+      // Return the formatted time in the desired format (if you want to display it differently)
+      return DateFormat('h:mm a').format(alarmDate);
+    } catch (e) {
+      print('Error formatting time: $e');
+      return 'Invalid Time';
+    }
   }
 }
