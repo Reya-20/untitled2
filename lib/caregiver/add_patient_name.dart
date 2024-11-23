@@ -25,7 +25,7 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _fetchPatients() async {
-    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/patient_api/get_patient.php');
+    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_patient.php');
 
     try {
       final response = await http.get(url);
@@ -38,6 +38,7 @@ class _PatientScreenState extends State<PatientScreen> {
             'name': patient['patient_name'] ?? '',
             'username': patient['username'] ?? '',
             'password': patient['password'] ?? '',
+            'isActive': true, // Default to active
           }).toList();
         });
       } else {
@@ -67,6 +68,7 @@ class _PatientScreenState extends State<PatientScreen> {
           'name': name,
           'username': username,
           'password': password,
+          'isActive': true, // Default to active
         });
         _nameController.clear();
         _usernameController.clear();
@@ -78,7 +80,7 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _uploadPatient(String name, String username, String password) async {
-    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/post_patient.php'); // Updated to HTTPS
+    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/post_patient.php'); // Ensure this URL is correct.
 
     try {
       final response = await http.post(
@@ -88,7 +90,7 @@ class _PatientScreenState extends State<PatientScreen> {
           'patient_name': name,
           'username': username,
           'password': password,
-        }),
+        }), // Properly encoding the body to JSON
       );
 
       if (response.statusCode == 200) {
@@ -217,38 +219,51 @@ class _PatientScreenState extends State<PatientScreen> {
                   itemBuilder: (context, index) {
                     final patient = _patientList[index];
                     return Card(
-                      elevation: 3,
+                      elevation: 4,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      margin: EdgeInsets.symmetric(vertical: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Color(0xFF0E4C92),
+                          foregroundColor: Colors.white,
+                          child: Icon(Icons.person, size: 20), // Circle icon for patient
+                        ),
+                        title: Text(
+                          patient['name'],
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF26394A),
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              'Patient Name: ${patient['name']}',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Username: ${patient['username']}',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Password: ${patient['password']}',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _deletePatient(index),
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  patient['isActive'] = !(patient['isActive'] ?? true); // Toggle active state
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${patient['name']} is now ${patient['isActive']! ? 'Active' : 'Inactive'}',
+                                    ),
+                                    backgroundColor: patient['isActive']! ? Colors.green : Colors.orange,
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: patient['isActive'] ?? true ? Colors.green : Colors.red,
+                              ),
+                              child: Text(
+                                patient['isActive'] ?? true ? 'Active' : 'Inactive',
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
+
                           ],
                         ),
                       ),

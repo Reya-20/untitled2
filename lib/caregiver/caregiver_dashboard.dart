@@ -4,11 +4,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../include/sidebar.dart';
+import 'Alarm_History.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart'; // Speed Dial package
 import 'add_patient_name.dart';
 import 'add_pill_name.dart';
 import 'add_pill_dashboard.dart';
+import 'package:intl/intl.dart'; // Add this import for time parsing
+
 
 void main() {
   runApp(MyApp());
@@ -18,7 +21,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, // This removes the debug banner
       home: HomeCareScreen(),
       theme: ThemeData(
         primaryColor: Color(0xFF0E4C92),
@@ -40,65 +43,63 @@ class HomeCareScreen extends StatefulWidget {
 
 class _HomeCareScreenState extends State<HomeCareScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   int userRole = 1;
   List<Map<String, dynamic>> alarmData = [];
   bool hasNoAlarms = false;
   DateTime selectedDate = DateTime.now();
+  List<Map<String, dynamic>> _alarms = []; // List to hold alarms
 
   @override
   void initState() {
     super.initState();
-    _getUserRole();
     _fetchAlarmData();
   }
 
-  Future<void> _getUserRole() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userRole = prefs.getInt('userRole') ?? 1;
-    });
-  }
-
-  Future<void> _fetchAlarmData({String? patientId}) async {
-    String url;
-    if (patientId == null) {
-      url = 'http://your_api_url/get_alarm.php?role=$userRole';
-    } else {
-      url =
-      'http://your_api_url/get_alarm.php?patient_id=$patientId&role=$userRole';
-    }
-
+  Future<void> _fetchAlarmData() async {
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_alarm.php'));
+
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is List && data.isNotEmpty) {
+        print('Response body: ${response.body}');
+
+        final Map<String, dynamic> data = json.decode(response.body);
+
+        if (data['success'] == true && data['data'] is List) {
           setState(() {
-            alarmData = data
-                .map((item) =>
-            {
-              'patient_name': item['patient_name'],
-              'medicine_name': item['pill_name'],
-              'time': item['time'],
-              'reminder_message': item['reminder_message'],
-              'status_remark': item['status_remark'],
-            })
-                .toList();
-            hasNoAlarms = false;
+            _alarms = List<Map<String, dynamic>>.from(data['data']).map((alarm) {
+              String time = alarm['formatted_time'] ?? '00:00 AM';
+              String reminderMessage = alarm['reminder_message'] ?? '';
+              String patientName = alarm['patient_name'] ?? 'Unknown';
+              String pillName = alarm['pill_name'] ?? 'Unknown Pill';
+
+              return {
+                'id': alarm['id'],
+                'time': time,
+                'reminder_message': reminderMessage,
+                'patient_name': patientName,
+                'pill_name': pillName,
+                'status_remark': alarm['status_remark'] ?? 'Pending',
+              };
+            }).toList();
           });
         } else {
+          print('Error: Expected a list of alarms but found something else or success is false.');
           setState(() {
-            alarmData = [];
-            hasNoAlarms = true;
+            _alarms = [];
           });
         }
       } else {
-        print('Failed to load alarm data: ${response.statusCode}');
+        print('Failed to load reminders. HTTP status: ${response.statusCode}');
+        setState(() {
+          _alarms = [];
+        });
       }
     } catch (e) {
-      print('Error fetching alarm data: $e');
+      print('Error fetching reminders: $e');
+      setState(() {
+        _alarms = [];
+      });
     }
   }
 
@@ -142,10 +143,8 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
         ),
         child: Column(
           children: [
-            // Row to include the menu button before the calendar
             Padding(
               padding: const EdgeInsets.only(top: 40, left: 10),
-              // Positioning button
               child: Row(
                 children: [
                   IconButton(
@@ -155,7 +154,6 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                     },
                   ),
                   Spacer(),
-                  // Notification button
                   IconButton(
                     icon: Icon(Icons.notifications, color: Colors.white),
                     onPressed: _showNotificationDialog,
@@ -163,11 +161,7 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                 ],
               ),
             ),
-
-            // Add space between menu button and calendar
             SizedBox(height: 5),
-
-            // Calendar Widget
             TableCalendar(
               firstDay: DateTime.utc(2000),
               lastDay: DateTime.utc(2100),
@@ -177,7 +171,6 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                 setState(() {
                   selectedDate = selectedDay;
                 });
-                // Optionally, filter alarms based on `selectedDate`
               },
               selectedDayPredicate: (day) => isSameDay(day, selectedDate),
               calendarStyle: CalendarStyle(
@@ -190,17 +183,11 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                   shape: BoxShape.circle,
                 ),
                 defaultTextStyle: TextStyle(color: Colors.white),
-                // Make calendar text white
                 todayTextStyle: TextStyle(color: Colors.white),
-                // Make today's date text white
-                selectedTextStyle: TextStyle(
-                    color: Colors.white), // Make selected day text white
+                selectedTextStyle: TextStyle(color: Colors.white),
               ),
             ),
-
-            SizedBox(height: 20), // Add space between calendar and card
-
-            // Alarm List
+            SizedBox(height: 20),
             Expanded(
               child: hasNoAlarms
                   ? Center(
@@ -220,15 +207,15 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                 padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(50), // Rounded top left corner
-                    topRight: Radius.circular(50), // Rounded top right corner
+                    topLeft: Radius.circular(50),
+                    topRight: Radius.circular(50),
                   ),
                   color: Color(0xEAEBEBEF),
                 ),
                 child: ListView.builder(
-                  itemCount: alarmData.length,
+                  itemCount: _alarms.length,
                   itemBuilder: (context, index) {
-                    return _buildAlarmCard(alarmData[index]);
+                    return _buildAlarmCard(_alarms[index]);
                   },
                 ),
               ),
@@ -237,7 +224,6 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      // Adjust position
       floatingActionButton: SpeedDial(
         icon: Icons.add,
         backgroundColor: Color(0xFF26394A),
@@ -264,7 +250,7 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
           ),
           SpeedDialChild(
             child: Icon(Icons.lock_clock),
-            label: 'Make Alarm Reminder',
+            label: 'Create Reminder',
             onTap: () {
               Navigator.push(
                 context,
@@ -273,58 +259,109 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
             },
           ),
           SpeedDialChild(
-            child: Icon(Icons.history),
-            label: 'Medicine History',
+            child: Icon(Icons.book),
+            label: 'View History',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => PatientScreen()),
+                MaterialPageRoute(builder: (context) => AlarmHistoryScreen()),
               );
             },
           ),
-
         ],
       ),
     );
   }
 
   Widget _buildAlarmCard(Map<String, dynamic> alarm) {
-    return Padding(
-      padding: const EdgeInsets.all(10.0),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20), // More rounded corners
-          color: Colors.white,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Only show the "Today" label if alarm data is available
-              if (alarm != null) // Check if there is alarm data
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10.0),
-                  // Adds space below "Today"
-                  child: Text(
-                    'Today',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.blue, // You can change the color here
-                    ),
-                  ),
+    return Card(
+      elevation: 5,
+      margin: EdgeInsets.symmetric(vertical: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Time display
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+              decoration: BoxDecoration(
+                color: Color(0xFF006D77),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                alarm['time'] ?? '00:00 AM',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-              // Alarm details
-              Text("Patient: ${alarm['patient_name']}"),
-              Text("Medicine: ${alarm['medicine_name']}"),
-              Text("Time: ${alarm['time']}"),
-              Text("Reminder: ${alarm['reminder_message']}"),
-              Text("Status: ${alarm['status_remark']}"),
-            ],
-          ),
+              ),
+            ),
+            SizedBox(width: 20),
+            // Expanded content for pill name and reminder message
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    alarm['pill_name'] ?? 'Unknown Pill',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    'To: ${alarm['patient_name'] ?? 'Unknown'} - ${alarm['reminder_message'] ?? 'No Reminder Message'}',
+                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+            // Status Remark display on the right
+            Text(
+              alarm['status_remark'] ?? 'No Status',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _parseTime(String time) {
+    try {
+      // Ensure the time is not empty and valid
+      if (time.isNotEmpty) {
+        var format = DateFormat("h:mm a"); // 12-hour format (e.g., 11:30 AM)
+        var parsedTime = format.parse(time);
+        return DateFormat("HH:mm").format(parsedTime); // Convert to 24-hour format
+      } else {
+        return '00:00 AM'; // Return default time if input is invalid or empty
+      }
+    } catch (e) {
+      print('Error parsing time: $e');
+      return '00:00 AM'; // Fallback to default time
+    }
+  }
+
+  bool _isToday(String alarmTime) {
+    try {
+      // Parse the alarm time with the correct format
+      var format = DateFormat("h:mm a"); // 12-hour format (e.g., 11:30 AM)
+      DateTime alarmDate = format.parse(alarmTime);
+      DateTime currentDate = DateTime.now();
+
+      // Compare date without time
+      return currentDate.year == alarmDate.year &&
+          currentDate.month == alarmDate.month &&
+          currentDate.day == alarmDate.day;
+    } catch (e) {
+      print('Error comparing dates: $e');
+      return false;
+    }
   }
 }
