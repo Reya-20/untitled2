@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../include/sidebar.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -5,8 +6,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart'; // Import for date formatting
 import 'dart:async'; // Import for Timer
-import 'dart:ui'; // For BackdropFilter
-
 
 void main() {
   runApp(MyApp());
@@ -120,65 +119,220 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkAlarms() async {
     final now = DateTime.now();
-    final currentTime = DateFormat('HH:mm').format(now);
+    final currentTime = DateFormat('h:mm a').format(now).trim(); // Current time in 12-hour format, trimmed
 
-    print('Current time: $currentTime');
+    print('Current time: $currentTime'); // Debugging: print current time
 
-    for (var alarm in _alarms) {
-      final alarmTime = alarm['time'] as String?;
-      if (alarmTime != null) {
-        final formattedAlarmTime = alarmTime.substring(0, 5);
-        final alarmId = alarm['id'] is int ? alarm['id'] : int.tryParse(alarm['id'].toString()) ?? 0;
+    if (_alarms.isEmpty) {
+      print('No alarms available');
+    } else {
+      print('Checking alarms...');
+      for (var alarm in _alarms) {
+        final alarmTime = alarm['time'] as String?;  // Time from the alarm data (assumed to be in 12-hour format)
+        if (alarmTime != null) {
+          final formattedAlarmTime = alarmTime.trim(); // Format alarm time to remove extra spaces
 
-        // Check if the alarm is due and dialog is not already showing
-        if (formattedAlarmTime == currentTime && !_isDialogShowing) {
-          // Pop up the dialog first, before anything else
-          _showAlarmDialog(alarmId);
+          print('Checking alarm with time: $formattedAlarmTime');
 
-          // After the dialog is shown, schedule the notification and start the sound
-          await _scheduleNotification();
+          // Normalize both times by parsing them to DateTime objects
+          try {
+            final currentTimeDate = DateFormat('h:mm a').parse(currentTime);
+            final alarmTimeDate = DateFormat('h:mm a').parse(formattedAlarmTime);
 
-          // Start a timer to check if the dialog is still showing after 1 minute
-          _timer = Timer(Duration(minutes: 3), () async {
-            if (_isDialogShowing) {
-              // If the dialog is still showing after 1 minute, mark the alarm as missed
-              await _updateAlarmStatusToMissed(alarmId);
+            // Compare the DateTime objects directly
+            if (currentTimeDate == alarmTimeDate && !_isDialogShowing) {
+              print('Time matches! Triggering alarm.');
+
+              // Show the modal (dialog)
+              _showAlarmDialog(alarm);
+
+              // Play alarm sound
+              _playAlarmSound();
+
+              // Set a timer to mark the alarm as missed after a specified duration (if not dismissed)
+              _timer = Timer(Duration(minutes: 3), () async {
+                if (_isDialogShowing) {
+                  // If the dialog is still showing, mark the alarm as missed
+                  await _updateAlarmStatusToMissed(alarm['id']);
+                }
+              });
+
+              break; // Exit the loop once the alarm is triggered
+            } else {
+              print('Time does not match');
             }
-          });
-
-          // Cancel any previously running timer
-          _timer?.cancel();
-          break;
+          } catch (e) {
+            print('Error parsing time: $e');
+          }
         }
       }
     }
   }
 
 
+  Future<void> _showAlarmDialog(Map<String, dynamic> alarm) async {
+    setState(() {
+      _isDialogShowing = true; // Mark the dialog as showing
+    });
+
+    print('Displaying alarm dialog for alarm: ${alarm['id']}');
+
+    try {
+      await showDialog(
+        context: context,
+        barrierDismissible: false, // Prevent dismissal by tapping outside
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20.0), // Smooth rounded corners
+            ),
+            backgroundColor: Colors.white, // White background for the dialog
+            title: Row(
+              children: [
+                Icon(
+                  Icons.notification_important,
+                  color: Colors.redAccent, // Red color for the alarm icon
+                  size: 30.0,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Alarm Alert',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Display the patient and pill details with enhanced styling
+                  Text(
+                    'Patient: ${alarm['patient_name']}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Pill: ${alarm['pill_name']}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Reminder: ${alarm['reminder_message']}',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 20),
+                  // A separator line to improve the UI
+                  Divider(color: Colors.grey),
+                  SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // "Taken" button
+                      ElevatedButton(
+                        onPressed: () {
+                          // Ensure alarmId is passed as an integer
+                          _updateAlarmStatus(int.parse(alarm['id'].toString()));
+                          _dismissAlarmDialog(alarm['id']);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green, // Green color for "Taken"
+                          padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30), // Rounded corners for the button
+                          ),
+                        ),
+                        child: Text(
+                          'Taken',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                      SizedBox(width: 20), // Space between buttons
+                      // "Dismiss" button
+                      ElevatedButton(
+                        onPressed: () {
+                          // Close the dialog
+                          Navigator.of(context).pop(); // This will close the dialog
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey, // Grey color for "Dismiss"
+                          padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: Text(
+                          'Dismiss',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      print('Error showing alarm dialog: $e');
+    }
+  }
+
+
+  void _dismissAlarmDialog(int alarmId) {
+    Navigator.of(context).pop();
+    setState(() {
+      _isDialogShowing = false; // Mark the dialog as dismissed
+    });
+
+    // Update the alarm status to "dismissed"
+    _updateAlarmStatusToDismissed(alarmId);
+  }
+
 
   Future<void> _updateAlarmStatusToMissed(int alarmId) async {
     try {
-      final response = await http.put(
-        Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_update_missed.php'), // Ensure this URL is correct
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {'id': alarmId.toString(), 'status': '2'}, // Send as form data for missed
+      final response = await http.post(
+        Uri.parse('https://your-api-url/update_alarm_status.php'),
+        body: {
+          'id': alarmId.toString(),
+          'status': 'missed',
+        },
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success']) {
-          print('Alarm status updated to missed successfully');
-        } else {
-          print('Failed to update alarm status to missed: ${responseData['message']}');
-        }
+        print('Alarm marked as missed');
       } else {
-        print('Failed to update alarm status to missed: ${response.statusCode}');
+        print('Failed to mark alarm as missed');
       }
     } catch (e) {
       print('Error updating alarm status to missed: $e');
+    }
+  }
+
+  Future<void> _updateAlarmStatusToDismissed(int alarmId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://your-api-url/update_alarm_status.php'),
+        body: {
+          'id': alarmId.toString(),
+          'status': 'dismissed',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print('Alarm marked as dismissed');
+      } else {
+        print('Failed to mark alarm as dismissed');
+      }
+    } catch (e) {
+      print('Error updating alarm status to dismissed: $e');
     }
   }
 
@@ -219,61 +373,21 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _showAlarmDialog(int alarmId) {
-    if (!_isDialogShowing) {
-      _isDialogShowing = true; // Ensure the flag is set to prevent multiple dialogs
 
-      showDialog(
-        context: context,
-        barrierDismissible: false, // Prevent dismissing by tapping outside the dialog
-        builder: (context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.alarm, color: Colors.redAccent),
-                SizedBox(width: 8),
-                Text('Alarm'),
-              ],
-            ),
-            content: Text('It\'s time to take your medicine.'),
-            actions: <Widget>[
-              TextButton(
-                child: Text('Take Meds'),
-                onPressed: () async {
-                  // Call to update the alarm status in the database
-                  await _updateAlarmStatus(alarmId);
+  Future<void> _playAlarmSound() async {
+    final player = AudioPlayer();
 
-                  // Cancel the notification and stop the looping sound
-                  await flutterLocalNotificationsPlugin.cancel(0);
-                  _soundLoopTimer?.cancel(); // Stop the loop timer if it's running
+    // Use setSource to load sound from assets (no need for setSourceAsset in 6.1.0)
+    await player.setSource(AssetSource('asset/music/alarm.mp3'));
 
-                  // Dismiss the dialog
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop(); // Close the dialog
-                  }
-
-                  // Reset the dialog showing flag
-                  _isDialogShowing = false;
-                },
-              ),
-            ],
-          );
-        },
-      ).then((_) {
-        // Ensure _isDialogShowing is reset when the dialog is dismissed manually
-        _isDialogShowing = false;
-      });
-    }
+    // Play the sound after setting the source
+    await player.play(AssetSource('asset/music/alarm.mp3'));
   }
-
 
   Future<void> _updateAlarmStatus(int alarmId) async {
     try {
       final response = await http.put(
-        Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_update.php'), // Ensure this URL is correct
+        Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/alarm_api/alarm_update.php'), // Ensure this URL is correct
         headers: {'Content-Type': 'application/x-www-form-urlencoded'}, // Use correct content type
         body: {'id': alarmId.toString(), 'status': '1'}, // Send as form data
       );
@@ -286,10 +400,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (responseData['success']) {
           print('Alarm status updated to 1 (meds taken) successfully');
 
-          // Start a timer to reset the status to 0 after 1 second
-          Timer(Duration(seconds: 3), () async {
+          // Start a timer to reset the status to 0 after 3 seconds
+          Timer(Duration(seconds: 5), () async {
             final resetResponse = await http.put(
-              Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm/alarm_api/alarm_update.php'), // Ensure this URL is correct
+              Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/alarm_api/alarm_update.php'), // Use consistent URL
               headers: {'Content-Type': 'application/x-www-form-urlencoded'},
               body: {'id': alarmId.toString(), 'status': '0'}, // Reset to status 0
             );
@@ -312,110 +426,62 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.transparent,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight), // AppBar height
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF39cdaf), Color(0xFF26394A)], // Gradient colors
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: AppBar(
+            leading: IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: () {
+                _scaffoldKey.currentState!.openDrawer();
+              },
+            ),
+
+            backgroundColor: Colors.transparent, // Make AppBar background transparent for gradient
+            elevation: 0, // Remove shadow/elevation
+          ),
+        ),
+      ),
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
         userRole: userRole,
       ),
-      body: Stack(
-        children: [
-          // Background with gradient and transparent circles
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF39cdaf), Color(0xFF26394A)], // Gradient colors
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF39cdaf), Color(0xFF26394A)], // Gradient colors
+            begin: Alignment.topLeft, // Gradient start point
+            end: Alignment.bottomRight, // Gradient end point
           ),
-          // Adding transparent circles
-          Positioned(
-            top: 50,
-            left: 30,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 100,
-            right: 50,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.15),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 200,
-            right: 20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
-              ),
-            ),
-          ),
-          // Main content
-          Column(
-            children: [
-              // Row to include the menu button
-              Padding(
-                padding: const EdgeInsets.only(top: 40, left: 10),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.menu, color: Colors.white),
-                      onPressed: () {
-                        _scaffoldKey.currentState?.openDrawer();
-                      },
-                    ),
-                    Spacer(),
-                    // Add other buttons here if needed
-                  ],
-                ),
-              ),
-              // Add a sidebox or any widget after the row
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(16),
-                color: Colors.white.withOpacity(0.5),
+        ),
+        child: Column(
+          children: [
 
+
+            // Alarm content
+            hasNoAlarms
+                ? Center(child: Text("No alarms found", style: TextStyle(color: Colors.white)))
+                : Expanded(
+              child: ListView.builder(
+                itemCount: alarmData.length,
+                itemBuilder: (context, index) {
+                  return _buildAlarmCard(alarmData[index]);
+                },
               ),
-              // Alarm content
-              Expanded(
-                child: hasNoAlarms
-                    ? Center(
-                  child: Text(
-                    "No alarms found",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                )
-                    : ListView.builder(
-                  itemCount: alarmData.length,
-                  itemBuilder: (context, index) {
-                    return _buildAlarmCard(alarmData[index]);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
-
 
   Widget _buildAlarmCard(Map<String, dynamic> alarm) {
     return Padding(
