@@ -7,6 +7,7 @@ import '../caregiver/add_pill_name.dart';
 import '../caregiver/caregiver_dashboard.dart';
 import '../start.dart';
 import '../user/user_dashboard.dart';
+import '../caregiver/wifi.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // For managing session
 
@@ -97,7 +98,15 @@ class CustomDrawer extends StatelessWidget {
                 MaterialPageRoute(builder: (context) =>  HomeCareScreen()),
               );
             }),
-
+// Add WiFi settings for caregivers only
+          if (userRole == 1) ...[
+            _buildDrawerItem(context, Icons.wifi, 'WiFi Settings', () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => UpdateWifiPage()),
+              );
+            }),
+          ],
           const Spacer(),
           // Always show the Logout option
           _buildDrawerItem(context, Icons.logout, 'Logout', () {
