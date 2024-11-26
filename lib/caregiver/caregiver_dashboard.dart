@@ -9,7 +9,6 @@ import 'package:flutter_speed_dial/flutter_speed_dial.dart'; // Speed Dial packa
 import 'add_patient_name.dart';
 import 'add_pill_name.dart';
 import 'add_pill_dashboard.dart';
-import 'package:intl/intl.dart'; // Import the intl package
 
 void main() {
   runApp(MyApp());
@@ -19,7 +18,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // This removes the debug banner
+      debugShowCheckedModeBanner: false,
       home: HomeCareScreen(),
       theme: ThemeData(
         primaryColor: Color(0xFF0E4C92),
@@ -47,69 +46,59 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
   List<Map<String, dynamic>> alarmData = [];
   bool hasNoAlarms = false;
   DateTime selectedDate = DateTime.now();
-  List<Map<String, dynamic>> _alarms = []; // List to hold alarms
 
   @override
   void initState() {
     super.initState();
+    _getUserRole();
     _fetchAlarmData();
   }
 
-  Future<void> _fetchAlarmData() async {
+  Future<void> _getUserRole() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userRole = prefs.getInt('userRole') ?? 1;
+    });
+  }
+
+  Future<void> _fetchAlarmData({String? patientId}) async {
+    String url;
+    if (patientId == null) {
+      url = 'http://your_api_url/get_alarm.php?role=$userRole';
+    } else {
+      url =
+      'http://your_api_url/get_alarm.php?patient_id=$patientId&role=$userRole';
+    }
+
     try {
-      final response = await http.get(Uri.parse(
-          'https://springgreen-rhinoceros-308382.hostingersite.com/get_alarm.php'));
-
+      final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
-        // Log the response body to see the structure
-        print('Response body: ${response.body}');
-
-        // Decode the JSON response into a Map
-        final Map<String, dynamic> data = json.decode(response.body);
-
-        // Check if the 'success' key exists and if the 'data' key is a list
-        if (data['success'] == true && data['data'] is List) {
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) {
           setState(() {
-            // Format the time for each alarm to 12-hour format with AM/PM
-            _alarms =
-                List<Map<String, dynamic>>.from(data['data']).map((alarm) {
-                  // Ensure no null values are being used, provide default values where necessary
-
-                  String time = alarm['formatted_time'] ?? '00:00 AM'; // Provide default time if null
-                  String reminderMessage = alarm['reminder_message'] ?? ''; // Provide empty string if null
-                  String patientName = alarm['patient_name'] ?? 'Unknown'; // Provide default name if null
-                  String pillName = alarm['pill_name'] ?? 'Unknown Pill'; // Provide default pill name if null
-
-                  return {
-                    'id': alarm['id'],
-                    'time': time, // Time is already formatted in the response
-                    'reminder_message': reminderMessage,
-                    'patient_name': patientName,
-                    'pill_name': pillName,
-                  };
-                }).toList();
-            alarmData = _alarms;
-            hasNoAlarms = alarmData.isEmpty;
+            alarmData = data
+                .map((item) =>
+            {
+              'patient_name': item['patient_name'],
+              'medicine_name': item['pill_name'],
+              'time': item['time'],
+              'reminder_message': item['reminder_message'],
+              'status_remark': item['status_remark'],
+            })
+                .toList();
+            hasNoAlarms = false;
           });
         } else {
-          // Handle the case where the response data doesn't match the expected format
-          print(
-              'Error: Expected a list of alarms but found something else or success is false.');
           setState(() {
-            _alarms = []; // Reset the alarms list if the data is not valid
+            alarmData = [];
+            hasNoAlarms = true;
           });
         }
       } else {
-        print('Failed to load reminders. HTTP status: ${response.statusCode}');
-        setState(() {
-          _alarms = []; // Reset the alarms list in case of failure
-        });
+        print('Failed to load alarm data: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching reminders: $e');
-      setState(() {
-        _alarms = []; // Reset the alarms list in case of error
-      });
+      print('Error fetching alarm data: $e');
     }
   }
 
@@ -231,8 +220,8 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                 padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20), // Rounded top left corner
-                    topRight: Radius.circular(20), // Rounded top right corner
+                    topLeft: Radius.circular(50), // Rounded top left corner
+                    topRight: Radius.circular(50), // Rounded top right corner
                   ),
                   color: Color(0xEAEBEBEF),
                 ),
@@ -250,131 +239,92 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       // Adjust position
       floatingActionButton: SpeedDial(
-          icon: Icons.add,
-          backgroundColor: Color(0xFF26394A),
-          children: [
-            SpeedDialChild(
-              child: Icon(Icons.medical_information),
-              label: 'Add Pill',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => MedicineScreen()),
-                );
-              },
-            ),
-            SpeedDialChild(
-              child: Icon(Icons.person_add),
-              label: 'Add Patient',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => PatientScreen()),
-                );
-              },
-            ),
-            SpeedDialChild(
-              child: Icon(Icons.lock_clock),
-              label: 'Make Alarm Reminder',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => AlarmScreen()),
-                );
-              },
-            ),
-          ]
+        icon: Icons.add,
+        backgroundColor: Color(0xFF26394A),
+        children: [
+          SpeedDialChild(
+            child: Icon(Icons.medical_information),
+            label: 'Add Pill',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MedicineScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.person_add),
+            label: 'Add Patient',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PatientScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.lock_clock),
+            label: 'Make Alarm Reminder',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AlarmScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Icon(Icons.history),
+            label: 'Medicine History',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PatientScreen()),
+              );
+            },
+          ),
+
+        ],
       ),
     );
   }
 
   Widget _buildAlarmCard(Map<String, dynamic> alarm) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-      child: Card(
-        elevation: 6,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+      padding: const EdgeInsets.all(10.0),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20), // More rounded corners
+          color: Colors.white,
         ),
-        color: Colors.blue.shade50, // Lighter shade for a softer background
         child: Padding(
-          padding: const EdgeInsets.all(16.0), // Add some padding inside the card
-          child: Row(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon for Pill
-              Container(
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF39cdaf), // Matching color with the theme
-                ),
-                child: Icon(
-                  Icons.medical_services,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              SizedBox(width: 16), // Space between the icon and the text
-
-              // Main Text Column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${alarm['pill_name']} for ${alarm['patient_name']}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+              // Only show the "Today" label if alarm data is available
+              if (alarm != null) // Check if there is alarm data
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  // Adds space below "Today"
+                  child: Text(
+                    'Today',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.blue, // You can change the color here
                     ),
-                    SizedBox(height: 6), // Space between title and subtitle
-                    Text(
-                      'Reminder: ${alarm['reminder_message']}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-
-              // Time Text
-              Text(
-                _formatTime(alarm['time']),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF39cdaf), // Matching time color to theme
-                ),
-              ),
+              // Alarm details
+              Text("Patient: ${alarm['patient_name']}"),
+              Text("Medicine: ${alarm['medicine_name']}"),
+              Text("Time: ${alarm['time']}"),
+              Text("Reminder: ${alarm['reminder_message']}"),
+              Text("Status: ${alarm['status_remark']}"),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _formatTime(String time) {
-    try {
-      // Trim any leading or trailing spaces
-      time = time.trim();
-
-      // Use the DateFormat("h:mm a") to parse the time in 12-hour AM/PM format
-      DateFormat format = DateFormat("h:mm a");
-
-      // Parse the time string to DateTime
-      DateTime alarmDate = format.parse(time);
-
-      // Return the formatted time in the desired format (if you want to display it differently)
-      return DateFormat('h:mm a').format(alarmDate);
-    } catch (e) {
-      print('Error formatting time: $e');
-      return 'Invalid Time';
-    }
   }
 }

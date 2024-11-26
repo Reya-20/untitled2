@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -40,8 +41,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<void> _fetchMedicines() async {
-    final url = Uri.parse(
-        'http://springgreen-rhinoceros-308382.hostingersite.com/pill_api/get_pill.php');
+    final url = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/pill_api/get_pill.php');
 
     try {
       final response = await http.get(url);
@@ -88,8 +88,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
         return;
       }
 
-      bool success = await uploadMedicines(
-          medicineName, medicineCount, selectedContainer!);
+      bool success = await uploadMedicines(medicineName, medicineCount, selectedContainer!);
 
       if (success) {
         setState(() {
@@ -105,17 +104,14 @@ class _MedicineScreenState extends State<MedicineScreen> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            'Please enter medicine name, count, and select a container'),
+        content: Text('Please enter medicine name, count, and select a container'),
         backgroundColor: Colors.red,
       ));
     }
   }
 
-  Future<bool> uploadMedicines(String medicineName, int pillCount,
-      int container) async {
-    final url = Uri.parse(
-        'https://springgreen-rhinoceros-308382.hostingersite.com/post_pill.php');
+  Future<bool> uploadMedicines(String medicineName, int pillCount, int container) async {
+    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/post_pill.php');
     try {
       final requestBody = json.encode({
         'medicine_name': medicineName,
@@ -163,7 +159,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
         content: Text('Error: pill_id is missing for this medicine'),
         backgroundColor: Colors.red,
       ));
-      return; // Early return if pill_id is null
+      return;  // Early return if pill_id is null
     }
 
     // Show confirmation dialog
@@ -171,10 +167,8 @@ class _MedicineScreenState extends State<MedicineScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15)),
-          title: Text("Delete Medicine",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text("Delete Medicine", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           content: Text('Are you sure you want to delete this medicine?'),
           actions: [
             TextButton(
@@ -186,8 +180,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
             TextButton(
               onPressed: () async {
                 // Proceed with deletion
-                bool success = await _deleteMedicineFromDB(
-                    pillId); // Pass pillId here
+                bool success = await _deleteMedicineFromDB(pillId); // Pass pillId here
                 if (success) {
                   setState(() {
                     _medicineList.removeAt(index);
@@ -204,8 +197,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<bool> _deleteMedicineFromDB(int pillId) async {
-    final url = Uri.parse(
-        'https://springgreen-rhinoceros-308382.hostingersite.com/delete_pill.php');
+    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/delete_pill.php');
 
     try {
       final requestBody = json.encode({
@@ -252,10 +244,8 @@ class _MedicineScreenState extends State<MedicineScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15)),
-          title: Text("Add Medicine",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text("Add Medicine", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           content: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -321,19 +311,14 @@ class _MedicineScreenState extends State<MedicineScreen> {
       key: _scaffoldKey,
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(Icons.menu),
           onPressed: () {
-            Navigator.pop(
-                context); // This will pop the current screen off the stack
+            _scaffoldKey.currentState!.openDrawer();
           },
         ),
-        backgroundColor: Colors.transparent, // Make the AppBar transparent
-        elevation: 0, // Remove the elevation/shadow
-        iconTheme: IconThemeData(
-            color: Colors.white), // Change the icon color to white
+        title: Text('Add Medicine'),
+        backgroundColor: Color(0xFF0E4C92),
       ),
-      extendBodyBehindAppBar: true,
-      // Allow the body to extend behind the AppBar
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
@@ -342,113 +327,97 @@ class _MedicineScreenState extends State<MedicineScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF39cdaf), Color(0xFF26394A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              Color(0xFF39cdaf),
+              Color(0xFF0E4C92),
+            ],
           ),
         ),
-        child: Column(
-          children: [
-            SizedBox(height: 80),
-            // Add SizedBox to push content down below the app bar
-            Center(
-              child: Text(
-                'Manage Your Medicine List',
-                style: TextStyle(fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white),
-              ),
-            ),
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(8),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 8.0,
-                  mainAxisSpacing: 8.0,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: _medicineList.length,
-                itemBuilder: (context, index) {
-                  return Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    elevation: 8,
-                    shadowColor: Colors.black.withOpacity(0.4),
-                    color: Colors.white,
-                    margin: EdgeInsets.all(8),
-                    child: InkWell(
-                      onTap: () {
-                        // Add interactive functionality here if needed
-                      },
-                      borderRadius: BorderRadius.circular(15),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Stack(
+        child: GridView.builder(
+          padding: const EdgeInsets.all(8),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8.0,
+            mainAxisSpacing: 8.0,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: _medicineList.length,
+          itemBuilder: (context, index) {
+            return Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              elevation: 8,
+              shadowColor: Colors.black.withOpacity(0.4),
+              color: Colors.white,
+              margin: EdgeInsets.all(8),
+              child: InkWell(
+                onTap: () {
+                  // You can add some interactive functionality here if needed
+                },
+                borderRadius: BorderRadius.circular(15),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Stack(
+                    children: [
+                      // Centered icon
+                      Center(
+                        child: Icon(
+                          Icons.medication,
+                          size: 60,
+                          color: Color(0xFF39cdaf),
+                        ),
+                      ),
+                      // Positioned text below the icon
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: Column(
                           children: [
-                            // Centered icon
-                            Center(
-                              child: Icon(
-                                Icons.medication,
-                                size: 60,
-                                color: Color(0xFF39cdaf),
+                            Text(
+                              _medicineList[index]['pill_name'] ?? 'Unknown',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0E4C92),
                               ),
                             ),
-                            // Positioned text below the icon
-                            Positioned(
-                              bottom: 16,
-                              left: 16,
-                              right: 16,
-                              child: Column(
-                                children: [
-                                  Text(
-                                    _medicineList[index]['pill_name'] ??
-                                        'Unknown',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0E4C92),
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Count: ${_medicineList[index]['pill_count']}',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Edit and Delete buttons
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () {
-                                      _deleteMedicine(index);
-                                    },
-                                  ),
-                                ],
+                            SizedBox(height: 8),
+                            Text(
+                              'Count: ${_medicineList[index]['pill_count']}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  );
-                },
+                      // Edit and Delete buttons
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                _deleteMedicine(index);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
       floatingActionButton: FloatingActionButton(

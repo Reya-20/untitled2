@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart'; // Import the intl package
+import '../include/sidebar.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -13,9 +14,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: Color(0xFF006D77),
-        scaffoldBackgroundColor: Colors.transparent, // Set transparent background for Scaffold
-        fontFamily: 'Roboto',
+        primaryColor: Color(0xFF26394A),
+        scaffoldBackgroundColor: Colors.grey[100],
+        fontFamily: 'Arial',
       ),
       home: AlarmScreen(),
     );
@@ -30,23 +31,23 @@ class AlarmScreen extends StatefulWidget {
 class _AlarmScreenState extends State<AlarmScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   TimeOfDay _selectedTime = TimeOfDay.now();
+  final _medicineNameController = TextEditingController();
   final _reminderMessageController = TextEditingController();
   String? _selectedPillId;
   String? _selectedPatientId;
   List<Map<String, dynamic>> _medicineData = [];
   List<Map<String, dynamic>> _patientData = [];
-  List<Map<String, dynamic>> _alarms = []; // List to hold alarms
 
   @override
   void initState() {
     super.initState();
     _fetchMedicineNames();
     _fetchPatientNames();
-    _fetchReminders(); // Load reminders
   }
 
   @override
   void dispose() {
+    _medicineNameController.dispose();
     _reminderMessageController.dispose();
     super.dispose();
   }
@@ -72,7 +73,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
 
   Future<void> _fetchPatientNames() async {
     try {
-      final response = await http.get(Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/get_patient.php'));
+      final response = await http.get(Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/patient_api/get_patient.php'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         setState(() {
@@ -88,57 +89,13 @@ class _AlarmScreenState extends State<AlarmScreen> {
       print('Error fetching patient names: $e');
     }
   }
-  Future<void> _fetchReminders() async {
-    try {
-      final response = await http.get(Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_reminder.php'));
-
-      if (response.statusCode == 200) {
-        // Log the response body to see the structure
-        print('Response body: ${response.body}');
-
-        // Decode the JSON response into a Map
-        final Map<String, dynamic> data = json.decode(response.body);
-
-        // Check if the 'data' key exists and if it's a list
-        if (data['success'] == true && data['data'] is List) {
-          setState(() {
-            // Format the time for each alarm to 12-hour format with AM/PM
-            _alarms = List<Map<String, dynamic>>.from(data['data']).map((alarm) {
-              // Ensure no null values are being used, provide default values where necessary
-
-              String time = alarm['formatted_time'] ?? '00:00 AM'; // Provide default time if null
-              String reminderMessage = alarm['reminder_message'] ?? ''; // Provide empty string if null
-              String patientName = alarm['patient_name'] ?? 'Unknown'; // Provide default name if null
-              String pillName = alarm['pill_name'] ?? 'Unknown Pill'; // Provide default pill name if null
-
-              return {
-                'id': alarm['id'],
-                'time': time, // Time is already formatted in the response
-                'reminder_message': reminderMessage,
-                'patient_name': patientName,
-                'pill_name': pillName,
-              };
-            }).toList();
-          });
-        } else {
-          print('Error: Expected a list of alarms but found something else.');
-        }
-      } else {
-        print('Failed to load reminders. HTTP status: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching reminders: $e');
-    }
-  }
-
 
   Future<void> _submitData() async {
     final pillId = _selectedPillId;
     final patientId = _selectedPatientId;
-    final reminderMessage = _reminderMessageController.text.trim();
-    final time = '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+    final reminderMessage = _reminderMessageController.text;
+    final time = '${_selectedTime.hour}:${_selectedTime.minute}';
 
-    // Validate inputs
     if (pillId == null || patientId == null || reminderMessage.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill in all fields')),
@@ -146,218 +103,72 @@ class _AlarmScreenState extends State<AlarmScreen> {
       return;
     }
 
-    try {
-      final uri = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/add_reminder.php');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'pill_id': pillId,
-          'patient_id': patientId,
-          'message': reminderMessage,
-          'time': time,
-        },
-      );
+    final uri = Uri.parse('http://springgreen-rhinoceros-308382.hostingersite.com/alarm_api/alarm_api.php');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'pill_id': pillId,
+        'patient_id': patientId,
+        'message': reminderMessage,
+        'time': time,
+      },
+    );
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Reminder added successfully')),
-          );
-
-          // Reset the form and state
-          setState(() {
-            _selectedPillId = null;
-            _selectedPatientId = null;
-            _reminderMessageController.clear();
-            _selectedTime = TimeOfDay.now();
-          });
-
-          // Refresh the reminders after submission
-          _fetchReminders();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(responseData['message'] ?? 'Failed to add reminder')),
-          );
-        }
-      } else {
-        print('Failed to add reminder. HTTP status: ${response.statusCode}');
-        print('Response body: ${response.body}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add reminder. Please try again later.')),
-        );
-      }
-    } catch (e) {
-      print('Error submitting reminder: $e');
+    if (response.statusCode == 200) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred. Please check your internet connection.')),
+        SnackBar(content: Text('Reminder added successfully')),
       );
+
+      // Clear fields after successful submission
+      setState(() {
+        _selectedPillId = null;
+        _selectedPatientId = null;
+        _reminderMessageController.clear();
+        _selectedTime = TimeOfDay.now(); // Reset to the current time
+      });
+    } else {
+      print('Failed to add reminder: ${response.statusCode}');
+      print('Response body: ${response.body}');
     }
   }
 
-  void _showBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 16.0,
-            left: 16.0,
-            right: 16.0,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Add Reminder',
-                style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 20),
-              _buildMedicineSelector(),
-              SizedBox(height: 15),
-              _buildPatientSelector(),
-              SizedBox(height: 15),
-              _buildMessageField(),
-              SizedBox(height: 15),
-              _buildTimeSelectorContainer(),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  _submitData();
-                  Navigator.of(context).pop(); // Close the bottom sheet
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF006D77),
-                  padding: EdgeInsets.symmetric(vertical: 15.0, horizontal: 30.0),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                ),
-                child: Text(
-                  'Save Reminder',
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white), // Ensures icon color is white
-      ),
-      extendBodyBehindAppBar: true, // This ensures the body content is behind the AppBar
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF39cdaf), Color(0xFF26394A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+
+        leading: IconButton(
+          icon: Icon(Icons.menu),
+          onPressed: () {
+            _scaffoldKey.currentState!.openDrawer();
+          },
         ),
+        title: Text(
+          'Medicine Reminder',
+          style: TextStyle(color: Colors.white), // Set text color to white
+        ),
+        backgroundColor: Color(0xFF26394A),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: ListView(
-          padding: EdgeInsets.all(16.0),
-          children: [
-            SizedBox(height: 80), // Add SizedBox to push content down below the app bar
-
-            // Add a label above the alarm cards
-            Center(
-              child: Text(
-                'Manage Your Medicine Reminders',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-            ),
-            SizedBox(height: 15), // Add space between the label and first card
-
-            // Display the list of alarms
-            ..._alarms.map((alarm) => _buildAlarmCard(alarm)).toList(),
-
-            SizedBox(height: 20),
-
-            // Centered message for adding a new alarm
-
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showBottomSheet(context),
-        backgroundColor: Color(0xFF006D77),
-        child: Icon(Icons.add, size: 30),
-      ),
-    );
-  }
-
-
-  Widget _buildAlarmCard(Map<String, dynamic> alarm) {
-    bool isActive = alarm['status'] == 'active';
-    return Card(
-      elevation: 5,
-      margin: EdgeInsets.symmetric(vertical: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Left side: Time (bold and large), with a colored background
-            Container(
-              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Color(0xFF006D77), // Set background color for the time section
-                borderRadius: BorderRadius.circular(10),
+          children: <Widget>[
+            _buildMedicineSelector(),
+            _buildPatientSelector(),
+            _buildMessageField(),
+            _buildTimeSelectorContainer(),
+            SizedBox(height: 20.0),
+            ElevatedButton(
+              onPressed: _submitData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF26394A),
+                padding: EdgeInsets.symmetric(vertical: 15.0),
               ),
               child: Text(
-                '${alarm['time']}',
-                style: TextStyle(
-                  fontSize: 22, // Large font size for time
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white, // White text for contrast
-                ),
-              ),
-            ),
-
-            // Horizontal Space after Time
-            SizedBox(width: 20),
-
-            // Right side: Medicine name and reminder message
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Medicine name
-                  Text(
-                    alarm['pill_name'],
-                    style: TextStyle(
-                      fontSize: 18, // Slightly smaller than time
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  SizedBox(height: 5), // Space between the medicine name and message
-
-                  // Reminder message and patient name
-                  Text(
-                    'To: ${alarm['patient_name']} - ${alarm['reminder_message'] ?? 'No reminder message'}',
-                    style: TextStyle(
-                      fontSize: 14, // Normal size for the message
-                      color: Colors.black54,
-                    ),
-                  ),
-                ],
+                'Add Reminder',
+                style: TextStyle(fontSize: 16, color: Colors.white), // Set text color to white
               ),
             ),
           ],
@@ -367,74 +178,118 @@ class _AlarmScreenState extends State<AlarmScreen> {
   }
 
   Widget _buildMedicineSelector() {
-    return DropdownButtonFormField<String>(
-      decoration: InputDecoration(labelText: 'Select Medicine'),
-      value: _selectedPillId,
-      items: _medicineData.map((pill) {
-        return DropdownMenuItem<String>(
-          value: pill['pill_id'],
-          child: Text(pill['pill_name']),
-        );
-      }).toList(),
-      onChanged: (value) {
-        setState(() {
-          _selectedPillId = value;
-        });
-      },
+    return _buildCard(
+      title: 'Select Medicine',
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _selectedPillId,
+        hint: Text('Choose a medicine'),
+        items: _medicineData.map<DropdownMenuItem<String>>((item) {
+          return DropdownMenuItem<String>(
+            value: item['pill_id'].toString(),
+            child: Text(item['pill_name']),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedPillId = newValue;
+          });
+        },
+      ),
     );
   }
 
   Widget _buildPatientSelector() {
-    return DropdownButtonFormField<String>(
-      decoration: InputDecoration(labelText: 'Select Patient'),
-      value: _selectedPatientId,
-      items: _patientData.map((patient) {
-        return DropdownMenuItem<String>(
-          value: patient['patient_id'],
-          child: Text(patient['patient_name']),
-        );
-      }).toList(),
-      onChanged: (value) {
-        setState(() {
-          _selectedPatientId = value;
-        });
-      },
+    return _buildCard(
+      title: 'Select Patient',
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _selectedPatientId,
+        hint: Text('Choose a patient'),
+        items: _patientData.map<DropdownMenuItem<String>>((item) {
+          return DropdownMenuItem<String>(
+            value: item['patient_id'].toString(),
+            child: Text(item['patient_name']),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedPatientId = newValue;
+          });
+        },
+      ),
     );
   }
 
   Widget _buildMessageField() {
-    return TextFormField(
-      controller: _reminderMessageController,
-      decoration: InputDecoration(labelText: 'Reminder Message'),
-      maxLines: 3,
+    return _buildCard(
+      title: 'Reminder Message',
+      child: TextField(
+        controller: _reminderMessageController,
+        decoration: InputDecoration(
+          hintText: 'Enter reminder message',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.note, color: Color(0xFF26394A)),
+        ),
+      ),
     );
   }
 
   Widget _buildTimeSelectorContainer() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Time: ${_selectedTime.format(context)}',
-          style: TextStyle(fontSize: 16),
-        ),
-        IconButton(
-          icon: Icon(Icons.access_time),
-          onPressed: _selectTime,
-        ),
-      ],
+    return _buildCard(
+      title: 'Select Time',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            _selectedTime.format(context),
+            style: TextStyle(fontSize: 18.0),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              _selectTime(context);
+            },
+            icon: Icon(Icons.access_time),
+            label: Text('Pick Time'),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _selectTime() async {
-    final TimeOfDay? newTime = await showTimePicker(
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
     );
-    if (newTime != null && newTime != _selectedTime) {
+    if (picked != null && picked != _selectedTime) {
       setState(() {
-        _selectedTime = newTime;
+        _selectedTime = picked;
       });
     }
+  }
+
+  Widget _buildCard({required String title, required Widget child}) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 10.0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10.0),
+      ),
+      elevation: 3.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8.0),
+            child,
+          ],
+        ),
+      ),
+    );
   }
 }
