@@ -103,25 +103,67 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
     }
   }
 
-  void _showNotificationDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('New Notification'),
-          content: Text('This is a notification message.'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('OK'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
+  void _showNotificationDialog() async {
+    // Fetch pill data from the server
+    try {
+      final response = await http.get(Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_pill_count.php'));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+
+        if (data['success'] == true && data['pill_data'] is List) {
+          // Iterate over the pill data to find pills with low quantities
+          String notificationMessage = '';
+
+          for (var pill in data['pill_data']) {
+            String pillQuantityStr = pill['pill_quantity']?.toString() ?? '0'; // Ensure it's a string
+            int pillQuantity = int.tryParse(pillQuantityStr) ?? 0; // Convert to int safely
+
+            String pillName = pill['pill_name'] ?? 'Unknown Pill';
+            String containerId = pill['container'] ?? 'Unknown Container';
+
+            // Check if the pill quantity is 2 or less
+            if (pillQuantity <= 2 && pillQuantity > 0) {
+              notificationMessage += 'Warning: $pillName in Container $containerId has low quantity ($pillQuantity pills remaining).\n';
+            } else if (pillQuantity == 0) {
+              notificationMessage += 'Alert: $pillName in Container $containerId is out of stock.\n';
+            }
+          }
+
+          if (notificationMessage.isEmpty) {
+            notificationMessage = 'All pills are well stocked!';
+          }
+
+          // Show dialog with the appropriate message
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Pill Stock Notification'),
+                content: Text(notificationMessage),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text('OK'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          // If the data format is incorrect
+          print('Error: Pill data is missing or malformed.');
+        }
+      } else {
+        print('Failed to fetch pill data. HTTP status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching pill data: $e');
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
